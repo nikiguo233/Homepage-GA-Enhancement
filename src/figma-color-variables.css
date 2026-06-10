@@ -1,0 +1,119 @@
+/**
+ * OCCAM color tokens from Figma variables (file: OCCAM-Input).
+ * Sourced via MCP get_variable_defs on Floating Button + spec nodes.
+ * Names: Figma path → kebab-case with `--occam-` prefix.
+ */
+
+:root {
+  /* Core palette — brand */
+  --occam-core-palette-brand-blue-010: #f7fbff;
+  --occam-core-palette-brand-blue-050: #e4f1ff;
+  --occam-core-palette-brand-blue-100: #c6dcff;
+  --occam-core-palette-brand-blue-400: #3269d4;
+  --occam-core-palette-brand-blue-500-b: #0d4ac3;
+  --occam-core-palette-brand-blue-600: #06389c;
+  --occam-core-palette-brand-navy-050: #e3eaef;
+  --occam-core-palette-brand-navy-300: #7c97ac;
+  --occam-core-palette-brand-navy-600: #33495c;
+  --occam-core-palette-brand-navy-700-b: #223341;
+  --occam-core-palette-brand-navy-800: #16212b;
+  --occam-core-palette-brand-cool-gray-050: #f6f7f8;
+  --occam-core-palette-brand-cool-gray-100: #d6d9db;
+  --occam-core-palette-brand-cool-gray-200: #b5babe;
+  --occam-core-palette-brand-cool-gray-500: #575e63;
+  --occam-core-palette-brand-cool-gray-600: #464c51;
+  --occam-core-palette-brand-cool-gray-700: #353b3f;
+  --occam-core-palette-brand-cool-gray-800: #24292c;
+  --occam-core-palette-contrasts-black: #000000;
+  --occam-core-palette-contrasts-white: #ffffff;
+
+  /* Common */
+  --occam-common-white-states-main: #ffffff;
+
+  /* Light theme — layout & action */
+  --occam-light-theme-layout-main-container: #ffffff;
+  --occam-light-theme-layout-emphasis-high: #000000;
+  --occam-light-theme-layout-emphasis-medium: #000000;
+  --occam-light-theme-layout-emphasis-low: #000000;
+  --occam-light-theme-layout-context-low: #000000;
+  --occam-light-theme-links-enabled: #0d4ac3;
+  --occam-light-theme-others-standard-input-line: #000000;
+  --occam-light-theme-others-outline-border: #000000;
+  --occam-light-theme-action-disabled: #000000;
+  --occam-light-theme-action-disabled-background: #000000;
+
+  /* Dark theme — layout & action */
+  --occam-dark-theme-layout-main-container: #16212b;
+  --occam-dark-theme-layout-emphasis-high: #ffffff;
+  --occam-dark-theme-layout-emphasis-low: #ffffff;
+  --occam-dark-theme-links-enabled: #8fb2f6;
+  --occam-dark-theme-action-disabled: #ffffff;
+
+  /* Composites (Figma stores multiple paints; split for CSS) */
+  --occam-light-theme-contained-default-enabled: #0d4ac3;
+  /* .Light Theme/Contained/Default/Hover → #0D4AC3, #FFFFFF */
+  --occam-light-theme-contained-default-hover-base: #0d4ac3;
+  --occam-light-theme-contained-default-hover-on-layer: #ffffff;
+  /* .Light Theme/Contained/Default/Pressed → #0D4AC3, #FFFFFF */
+  --occam-light-theme-contained-default-pressed-base: #0d4ac3;
+  --occam-light-theme-contained-default-pressed-on-layer: #ffffff;
+  /* .Dark Theme/Contained/Default/Hover → #2962D4, #FFFFFF */
+  --occam-dark-theme-contained-default-hover-base: #2962d4;
+  --occam-dark-theme-contained-default-hover-on-layer: #ffffff;
+
+  /* Elevation/2dp — Effect(type: DROP_SHADOW, color: #8A8A8A2B, offset: (1, 2), radius: 12, spread: 0) */
+  --occam-elevation-2dp-x: 1px;
+  --occam-elevation-2dp-y: 2px;
+  --occam-elevation-2dp-blur: 12px;
+  --occam-elevation-2dp-spread: 0px;
+  --occam-elevation-2dp-color: #8a8a8a2b;
+  --occam-elevation-2dp: var(--occam-elevation-2dp-x) var(--occam-elevation-2dp-y) var(--occam-elevation-2dp-blur)
+    var(--occam-elevation-2dp-spread) var(--occam-elevation-2dp-color);
+
+  /* Semantic aliases derived from Figma variables (opacity not always a separate token) */
+  --occam-floating-button-disabled-bg-light: color-mix(
+    in srgb,
+    var(--occam-light-theme-action-disabled-background) 12%,
+    transparent
+  );
+  --occam-floating-button-disabled-fg-light: color-mix(
+    in srgb,
+    var(--occam-light-theme-action-disabled) 38%,
+    transparent
+  );
+  --occam-floating-button-disabled-bg-dark: color-mix(
+    in srgb,
+    var(--occam-dark-theme-action-disabled) 16%,
+    transparent
+  );
+  --occam-floating-button-disabled-fg-dark: color-mix(
+    in srgb,
+    var(--occam-dark-theme-action-disabled) 45%,
+    transparent
+  );
+  --occam-floating-button-tertiary-border-light: color-mix(
+    in srgb,
+    var(--occam-light-theme-others-standard-input-line) 42%,
+    transparent
+  );
+  --occam-floating-button-tertiary-fg-light: color-mix(
+    in srgb,
+    var(--occam-light-theme-layout-emphasis-medium) 87%,
+    transparent
+  );
+  --occam-floating-button-secondary-border-disabled-dark: color-mix(
+    in srgb,
+    var(--occam-dark-theme-links-enabled) 35%,
+    transparent
+  );
+  --occam-floating-button-secondary-fg-disabled-dark: color-mix(
+    in srgb,
+    var(--occam-dark-theme-links-enabled) 40%,
+    transparent
+  );
+  --occam-floating-button-tertiary-border-disabled-dark: color-mix(
+    in srgb,
+    var(--occam-core-palette-brand-cool-gray-200) 45%,
+    transparent
+  );
+}
