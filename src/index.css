@@ -2873,7 +2873,24 @@ a {
 .widget-card-added {
   scroll-margin-top: 84px;
   scroll-margin-bottom: 48px;
-  animation: widget-card-added-in 180ms cubic-bezier(0.2, 0, 0, 1);
+  transform-origin: center center;
+}
+
+.widget-card-added:not(.widget-card-settled):not(.widget-card-spotlight) {
+  animation: widget-card-added-in 180ms cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+.widget-card-added.widget-card-settled:not(.widget-card-spotlight) {
+  animation: none;
+  transform: none;
+}
+
+.widget-card-added.widget-card-spotlight {
+  animation: widget-card-spotlight-pop 560ms cubic-bezier(0.2, 0, 0.2, 1) forwards;
+}
+
+.widget-card-added.widget-card-spotlight .widget-card-inner {
+  animation: widget-card-spotlight-glow 560ms cubic-bezier(0.2, 0, 0.2, 1) forwards;
 }
 
 .close-process-card .widget-card-inner {
@@ -3118,6 +3135,30 @@ a {
   }
 }
 
+@keyframes widget-card-spotlight-pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  42% {
+    transform: scale(1.014);
+  }
+}
+
+@keyframes widget-card-spotlight-glow {
+  0%,
+  100% {
+    box-shadow: var(--occam-elevation-widget-inner);
+  }
+
+  42% {
+    box-shadow:
+      0 0 0 3px rgba(13, 74, 195, 0.14),
+      0 2px 12px rgba(138, 138, 138, 0.2);
+  }
+}
+
 @media (max-width: 1180px) {
   .nebula-shell {
     min-width: 840px;
@@ -3340,6 +3381,9 @@ a {
   .feedback-toast,
   .widget-drawer,
   .widget-card-added,
+  .widget-card-added.widget-card-spotlight,
+  .widget-card-added.widget-card-spotlight .widget-card-inner,
+  .widget-card-added:not(.widget-card-settled):not(.widget-card-spotlight),
   .occam-switch .MuiSwitch-switchBase,
   .occam-switch .MuiSwitch-thumb,
   .occam-switch .MuiSwitch-track {
