@@ -219,6 +219,51 @@ function smoothScrollTo(element: HTMLElement, targetTop: number, duration: numbe
   });
 }
 
+function runAfterScrollSettles(scrollNode: HTMLElement, callback: () => void, maxWait = 1500) {
+  let settleTimeout = 0;
+  let maxTimeout = 0;
+  let done = false;
+
+  const finish = () => {
+    if (done) {
+      return;
+    }
+
+    done = true;
+    scrollNode.removeEventListener("scroll", handleScroll);
+    window.clearTimeout(settleTimeout);
+    window.clearTimeout(maxTimeout);
+    callback();
+  };
+
+  const handleScroll = () => {
+    window.clearTimeout(settleTimeout);
+    settleTimeout = window.setTimeout(finish, 120);
+  };
+
+  scrollNode.addEventListener("scroll", handleScroll, { passive: true });
+  maxTimeout = window.setTimeout(finish, maxWait);
+  handleScroll();
+}
+
+function triggerAddedWidgetSpotlight(widget: HTMLElement) {
+  widget.classList.add("widget-card-settled");
+  widget.classList.remove("widget-card-spotlight");
+  void widget.offsetWidth;
+  widget.classList.add("widget-card-spotlight");
+
+  const handleAnimationEnd = (event: AnimationEvent) => {
+    if (event.target !== widget || event.animationName !== "widget-card-spotlight-pop") {
+      return;
+    }
+
+    widget.classList.remove("widget-card-spotlight");
+    widget.removeEventListener("animationend", handleAnimationEnd);
+  };
+
+  widget.addEventListener("animationend", handleAnimationEnd);
+}
+
 function rangeProgress(value: number, start: number, end: number) {
   return Math.min(1, Math.max(0, (value - start) / (end - start)));
 }
@@ -1497,6 +1542,29 @@ function CloseProcessStatus({
 }: {
   widgetRef: RefObject<HTMLElement | null>;
 }) {
+  useEffect(() => {
+    const widget = widgetRef.current;
+
+    if (!widget) {
+      return undefined;
+    }
+
+    const handleEnterAnimationEnd = (event: AnimationEvent) => {
+      if (event.target !== widget || event.animationName !== "widget-card-added-in") {
+        return;
+      }
+
+      widget.classList.add("widget-card-settled");
+      widget.removeEventListener("animationend", handleEnterAnimationEnd);
+    };
+
+    widget.addEventListener("animationend", handleEnterAnimationEnd);
+
+    return () => {
+      widget.removeEventListener("animationend", handleEnterAnimationEnd);
+    };
+  }, [widgetRef]);
+
   return (
     <WidgetCard
       className="close-process-card widget-card-added"
@@ -2131,10 +2199,20 @@ export function App() {
   const handleViewAddedWidget = () => {
     setFeedbackToastVisible(false);
 
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const finishViewAddedWidget = () => {
+      addedWidgetRef.current?.focus({ preventScroll: true });
+
+      const widgetNode = addedWidgetRef.current;
+
+      if (!reducedMotion && widgetNode) {
+        triggerAddedWidgetSpotlight(widgetNode);
+      }
+    };
+
     const scrollToAddedWidget = () => {
-      const behavior: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth";
+      const behavior: ScrollBehavior = reducedMotion ? "auto" : "smooth";
       const scrollNode = scrollRef.current;
       const widgetNode = addedWidgetRef.current;
 
@@ -2146,12 +2224,12 @@ export function App() {
         window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
       }
 
-      window.setTimeout(
-        () => {
-          addedWidgetRef.current?.focus({ preventScroll: true });
-        },
-        behavior === "smooth" ? 500 : 0,
-      );
+      if (scrollNode && !reducedMotion) {
+        runAfterScrollSettles(scrollNode, finishViewAddedWidget);
+        return;
+      }
+
+      window.setTimeout(finishViewAddedWidget, reducedMotion ? 0 : 500);
     };
 
     window.requestAnimationFrame(() => {
