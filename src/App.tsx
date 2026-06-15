@@ -39,6 +39,7 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import {
   forwardRef,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -96,12 +97,18 @@ const sspBatches = [
 ] as const;
 
 const STICKY_TRANSITION_DISTANCE = 310;
+const WELCOME_TITLE_MORPH_Y = 54;
+const STICKY_HEADER_TITLE_TOP = 8;
+const STICKY_HEADER_HEIGHT = 56;
+const NOTIFICATION_BANNER_MARGIN_TOP = 24;
+const NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK = 136;
 const OCCAM_HEADLINE_L_SIZE = 28;
 const OCCAM_HEADLINE_L_LINE_HEIGHT = 40;
 const OCCAM_TITLE_L_SIZE = 17;
 const STICKY_TITLE_SCALE = OCCAM_TITLE_L_SIZE / OCCAM_HEADLINE_L_SIZE;
 
 type ActionsLayout = "stacked" | "horizontal";
+type BannerPlacement = "default" | "pin-on-scroll" | "chip-on-scroll";
 type WidgetDrawerStep = "closed" | "select" | "configure";
 
 const WIDGET_TYPES = [
@@ -164,6 +171,8 @@ type StickyProgressStyle = CSSProperties & {
   "--sticky-header-y": string;
   "--welcome-y": string;
   "--welcome-scale": number;
+  "--notification-banner-pinned-height": string;
+  "--chip-return-center-phase": number;
 };
 
 function clampStickyProgress(scrollTop: number) {
@@ -172,6 +181,42 @@ function clampStickyProgress(scrollTop: number) {
 
 function easeInOut(value: number) {
   return value * value * (3 - 2 * value);
+}
+
+function easeInOutCubic(value: number) {
+  return value < 0.5 ? 4 * value * value * value : 1 - (-2 * value + 2) ** 3 / 2;
+}
+
+function smoothScrollTo(element: HTMLElement, targetTop: number, duration: number) {
+  return new Promise<void>((resolve) => {
+    const startTop = element.scrollTop;
+    const distance = targetTop - startTop;
+
+    if (Math.abs(distance) < 1) {
+      element.scrollTop = targetTop;
+      resolve();
+      return;
+    }
+
+    const startTime = performance.now();
+    let frame = 0;
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      element.scrollTop = startTop + distance * easeInOutCubic(progress);
+
+      if (progress < 1) {
+        frame = window.requestAnimationFrame(step);
+        return;
+      }
+
+      element.scrollTop = targetTop;
+      resolve();
+    };
+
+    frame = window.requestAnimationFrame(step);
+  });
 }
 
 function rangeProgress(value: number, start: number, end: number) {
@@ -274,6 +319,37 @@ function syncActionsLayoutUrl(actionsLayout: ActionsLayout) {
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
+function getBannerPlacement(): BannerPlacement {
+  if (typeof window === "undefined") {
+    return "default";
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const banner = params.get("banner");
+
+  if (banner === "pin-on-scroll") {
+    return "pin-on-scroll";
+  }
+
+  if (banner === "chip-on-scroll") {
+    return "chip-on-scroll";
+  }
+
+  return "default";
+}
+
+function syncBannerPlacementUrl(bannerPlacement: BannerPlacement) {
+  const url = new URL(window.location.href);
+
+  if (bannerPlacement === "default") {
+    url.searchParams.delete("banner");
+  } else {
+    url.searchParams.set("banner", bannerPlacement);
+  }
+
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function getInitialActionsGeometry(actionsLayout: ActionsLayout = getActionsLayout()) {
   const compactLayout =
     typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
@@ -284,10 +360,14 @@ function getInitialActionsGeometry(actionsLayout: ActionsLayout = getActionsLayo
   };
 }
 
-function useFloatingActionsGeometry(progress: number, actionsLayout: ActionsLayout) {
+function useFloatingActionsGeometry(
+  progress: number,
+  actionsLayout: ActionsLayout,
+  pinnedBannerHeight: number,
+) {
   const [geometry, setGeometry] = useState(() => getInitialActionsGeometry(actionsLayout));
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateGeometry = () => {
       const actionsSlot = document.querySelector<HTMLElement>(".header-actions-slot");
       const compactLayout = window.matchMedia("(max-width: 900px)").matches;
@@ -314,15 +394,28 @@ function useFloatingActionsGeometry(progress: number, actionsLayout: ActionsLayo
     updateGeometry();
     window.addEventListener("resize", updateGeometry);
 
+    const stickyHeader = document.querySelector<HTMLElement>(".homepage-sticky-header");
+    const pinnedBanner = document.querySelector<HTMLElement>(".notification-banner-fixed");
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateGeometry) : null;
+
+    resizeObserver?.observe(stickyHeader ?? document.documentElement);
+    resizeObserver?.observe(pinnedBanner ?? document.documentElement);
+
     return () => {
+      resizeObserver?.disconnect();
       window.removeEventListener("resize", updateGeometry);
     };
-  }, [actionsLayout, progress]);
+  }, [actionsLayout, pinnedBannerHeight, progress]);
 
   return geometry;
 }
 
-function useSearchMorphGeometry(progress: number) {
+function useSearchMorphGeometry(
+  progress: number,
+  bannerAffectsHero: boolean,
+  pinnedBannerHeight: number,
+) {
   const [geometry, setGeometry] = useState({
     "--search-morph-left": "24px",
     "--search-morph-top": "116px",
@@ -335,7 +428,7 @@ function useSearchMorphGeometry(progress: number) {
     "--search-morph-shadow": "var(--occam-elevation-2dp)",
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateGeometry = () => {
       const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search-placeholder");
       const stickySearch = document.querySelector<HTMLElement>(".sticky-search-placeholder");
@@ -371,14 +464,261 @@ function useSearchMorphGeometry(progress: number) {
     };
 
     updateGeometry();
+
+    const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
+    const pinnedBanner = document.querySelector<HTMLElement>(".notification-banner-fixed");
+    const stickyHeader = document.querySelector<HTMLElement>(".homepage-sticky-header");
+    const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateGeometry)
+        : null;
+
+    if (bannerRegion) {
+      resizeObserver?.observe(bannerRegion);
+    }
+
+    if (pinnedBanner) {
+      resizeObserver?.observe(pinnedBanner);
+    }
+
+    if (stickyHeader) {
+      resizeObserver?.observe(stickyHeader);
+    }
+
+    if (welcomeSearch) {
+      resizeObserver?.observe(welcomeSearch);
+    }
+
     window.addEventListener("resize", updateGeometry);
 
     return () => {
+      resizeObserver?.disconnect();
       window.removeEventListener("resize", updateGeometry);
     };
-  }, [progress]);
+  }, [bannerAffectsHero, pinnedBannerHeight, progress]);
 
   return geometry;
+}
+
+function useWelcomeHeroMorphY(bannerAffectsHero: boolean) {
+  const [welcomeTitleMorphY, setWelcomeTitleMorphY] = useState(WELCOME_TITLE_MORPH_Y);
+
+  useLayoutEffect(() => {
+    const getWelcomeHeadingOffset = () => {
+      const main = document.querySelector<HTMLElement>(".homepage-main");
+      const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
+
+      if (!main || !welcomeSearch) {
+        return WELCOME_TITLE_MORPH_Y;
+      }
+
+      let offset = 0;
+      let node: HTMLElement | null = welcomeSearch;
+
+      while (node && node !== main) {
+        offset += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+      }
+
+      return Math.max(WELCOME_TITLE_MORPH_Y, offset - STICKY_HEADER_TITLE_TOP);
+    };
+
+    const updateMorphY = () => {
+      setWelcomeTitleMorphY(getWelcomeHeadingOffset());
+    };
+
+    updateMorphY();
+
+    const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
+    const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateMorphY)
+        : null;
+
+    if (bannerRegion) {
+      resizeObserver?.observe(bannerRegion);
+    }
+
+    if (welcomeSearch) {
+      resizeObserver?.observe(welcomeSearch);
+    }
+
+    window.addEventListener("resize", updateMorphY);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateMorphY);
+    };
+  }, [bannerAffectsHero]);
+
+  return welcomeTitleMorphY;
+}
+
+function useBannerPinMotion(
+  bannerPlacement: BannerPlacement,
+  notificationBannerVisible: boolean,
+  scrollRef: RefObject<HTMLElement | null>,
+) {
+  const bannerAnchorRef = useRef<HTMLDivElement | null>(null);
+  const bannerSlotRef = useRef<HTMLDivElement | null>(null);
+  const bannerPinnedShellRef = useRef<HTMLDivElement | null>(null);
+  const [bannerPinned, setBannerPinned] = useState(false);
+  const [pinnedBannerHeight, setPinnedBannerHeight] = useState(NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK);
+
+  useEffect(() => {
+    if (bannerPlacement !== "pin-on-scroll" || !notificationBannerVisible) {
+      setBannerPinned(false);
+      return undefined;
+    }
+
+    const scrollNode = scrollRef.current;
+    const slot = bannerSlotRef.current;
+
+    if (!scrollNode || !slot) {
+      return undefined;
+    }
+
+    let frame = 0;
+
+    const getScrollTop = () =>
+      Math.max(
+        scrollNode.scrollTop,
+        window.scrollY,
+        document.documentElement.scrollTop,
+        document.body.scrollTop,
+      );
+
+    const updatePinned = () => {
+      frame = 0;
+      const scrollTop = getScrollTop();
+      const slotTop = slot.getBoundingClientRect().top;
+      setBannerPinned(scrollTop > 0 && slotTop <= 0);
+    };
+
+    const scheduleUpdate = () => {
+      if (frame) {
+        return;
+      }
+
+      frame = window.requestAnimationFrame(updatePinned);
+    };
+
+    updatePinned();
+    scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+
+      scrollNode.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+  }, [bannerPlacement, notificationBannerVisible, scrollRef]);
+
+  useLayoutEffect(() => {
+    if (bannerPlacement !== "pin-on-scroll" || !notificationBannerVisible || !bannerPinned) {
+      setPinnedBannerHeight(NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK);
+      return undefined;
+    }
+
+    const shell = bannerPinnedShellRef.current;
+
+    if (!shell) {
+      return undefined;
+    }
+
+    const updateHeight = () => {
+      setPinnedBannerHeight(shell.offsetHeight);
+    };
+
+    updateHeight();
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateHeight) : null;
+
+    resizeObserver?.observe(shell);
+    window.addEventListener("resize", updateHeight);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateHeight);
+    };
+  }, [bannerPinned, bannerPlacement, notificationBannerVisible]);
+
+  return {
+    bannerAnchorRef,
+    bannerPinned,
+    bannerPinnedShellRef,
+    bannerSlotRef,
+    pinnedBannerHeight,
+  };
+}
+
+function useBannerChipVisibility(
+  bannerPlacement: BannerPlacement,
+  notificationBannerVisible: boolean,
+  scrollRef: RefObject<HTMLElement | null>,
+  bannerSlotRef: RefObject<HTMLDivElement | null>,
+  stickyControlsActive: boolean,
+) {
+  const [bannerScrolledAway, setBannerScrolledAway] = useState(false);
+
+  useEffect(() => {
+    if (bannerPlacement !== "chip-on-scroll" || !notificationBannerVisible) {
+      setBannerScrolledAway(false);
+      return undefined;
+    }
+
+    const scrollNode = scrollRef.current;
+    const slot = bannerSlotRef.current;
+
+    if (!scrollNode || !slot) {
+      return undefined;
+    }
+
+    let frame = 0;
+
+    const updateVisibility = () => {
+      frame = 0;
+      setBannerScrolledAway(!isElementVisibleInScrollContainer(slot, scrollNode));
+    };
+
+    const scheduleUpdate = () => {
+      if (frame) {
+        return;
+      }
+
+      frame = window.requestAnimationFrame(updateVisibility);
+    };
+
+    updateVisibility();
+    scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+
+    return () => {
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+
+      scrollNode.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+    };
+  }, [bannerPlacement, bannerSlotRef, notificationBannerVisible, scrollRef]);
+
+  return (
+    bannerPlacement === "chip-on-scroll" &&
+    notificationBannerVisible &&
+    bannerScrolledAway &&
+    stickyControlsActive
+  );
 }
 
 function IconButton({ children, label }: { children: ReactNode; label: string }) {
@@ -536,10 +876,31 @@ function ConfigurePageIcon() {
   return <img alt="" aria-hidden="true" className="configure-page-icon" src={configureHomepageIconUrl} />;
 }
 
-function StickyHeader({ active }: { active: boolean }) {
+function StickyHeader({
+  active,
+  onAnnouncementChipClick,
+  showAnnouncementChip,
+}: {
+  active: boolean;
+  onAnnouncementChipClick?: () => void;
+  showAnnouncementChip?: boolean;
+}) {
   return (
     <header className="homepage-sticky-header" data-node-id="1:148707" aria-hidden={!active}>
-      <h1>Welcome to Zuora, Rachel Carter</h1>
+      <div className="sticky-header-leading">
+        <h1>Welcome to Zuora, Rachel Carter</h1>
+        {showAnnouncementChip ? (
+          <button
+            aria-label="View 1 announcement"
+            className="announcement-chip"
+            data-node-id="130:18299"
+            onClick={onAnnouncementChipClick}
+            type="button"
+          >
+            1 announcement
+          </button>
+        ) : null}
+      </div>
       <div className="sticky-actions">
         <SearchField className="sticky-search-placeholder" compact hidden />
         <div className="header-actions-slot" data-node-id="1:148714" aria-hidden="true" />
@@ -585,8 +946,8 @@ function LayoutVersionSelect({
   onChange: (value: ActionsLayout) => void;
 }) {
   return (
-    <label className="layout-version-select">
-      <span>Version</span>
+    <label className="prototype-control">
+      <span>Buttons</span>
       <select
         aria-label="Button layout version"
         value={value}
@@ -596,6 +957,48 @@ function LayoutVersionSelect({
         <option value="horizontal">Horizontal</option>
       </select>
     </label>
+  );
+}
+
+function BannerPlacementSelect({
+  value,
+  onChange,
+}: {
+  value: BannerPlacement;
+  onChange: (value: BannerPlacement) => void;
+}) {
+  return (
+    <label className="prototype-control">
+      <span>Banner</span>
+      <select
+        aria-label="Notification banner placement version"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value as BannerPlacement)}
+      >
+        <option value="default">Option 1 — Scrolls with content</option>
+        <option value="pin-on-scroll">Option 2 — Pin above header</option>
+        <option value="chip-on-scroll">Option 3 — Hide in header chip</option>
+      </select>
+    </label>
+  );
+}
+
+function PrototypeControls({
+  actionsLayout,
+  bannerPlacement,
+  onActionsLayoutChange,
+  onBannerPlacementChange,
+}: {
+  actionsLayout: ActionsLayout;
+  bannerPlacement: BannerPlacement;
+  onActionsLayoutChange: (value: ActionsLayout) => void;
+  onBannerPlacementChange: (value: BannerPlacement) => void;
+}) {
+  return (
+    <div className="prototype-controls">
+      <BannerPlacementSelect value={bannerPlacement} onChange={onBannerPlacementChange} />
+      <LayoutVersionSelect value={actionsLayout} onChange={onActionsLayoutChange} />
+    </div>
   );
 }
 
@@ -1402,6 +1805,138 @@ function WidgetDrawer({
   );
 }
 
+function NotificationBannerRegion({
+  bannerPlacement,
+  bannerPinned,
+  onClose,
+  anchorRef,
+  pinnedShellRef,
+  slotRef,
+}: {
+  bannerPlacement: BannerPlacement;
+  bannerPinned: boolean;
+  onClose: () => void;
+  anchorRef: RefObject<HTMLDivElement | null>;
+  pinnedShellRef: RefObject<HTMLDivElement | null>;
+  slotRef: RefObject<HTMLDivElement | null>;
+}) {
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const showPinnedOverlay = bannerPlacement === "pin-on-scroll" && bannerPinned;
+
+  useEffect(() => {
+    if (!showPinnedOverlay) {
+      setDetailsExpanded(false);
+    }
+  }, [showPinnedOverlay]);
+
+  return (
+    <div className="notification-banner-region" ref={anchorRef}>
+      <div
+        aria-hidden={showPinnedOverlay || undefined}
+        className="notification-banner-slot"
+        ref={slotRef}
+      >
+        <NotificationBanner onClose={onClose} />
+      </div>
+      {bannerPlacement === "pin-on-scroll" ? (
+        <div
+          aria-hidden={!showPinnedOverlay || undefined}
+          className="notification-banner-fixed"
+          ref={pinnedShellRef}
+        >
+          <NotificationBanner
+            detailsExpanded={detailsExpanded}
+            onClose={onClose}
+            onToggleDetails={() => setDetailsExpanded((current) => !current)}
+            pinned
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function NotificationBanner({
+  detailsExpanded = false,
+  onClose,
+  onToggleDetails,
+  pinned = false,
+}: {
+  detailsExpanded?: boolean;
+  onClose: () => void;
+  onToggleDetails?: () => void;
+  pinned?: boolean;
+}) {
+  const showCompactPinned = pinned && !detailsExpanded;
+  const bannerClassName = [
+    "notification-banner",
+    pinned ? "notification-banner-pinned" : "",
+    pinned && detailsExpanded ? "notification-banner-expanded" : "",
+    showCompactPinned ? "notification-banner-compact" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div
+      className={bannerClassName}
+      data-node-id="125:15457"
+      role="region"
+      aria-label="Notification"
+    >
+      <div className="notification-banner-content">
+        <InfoOutlinedIcon aria-hidden="true" className="notification-banner-icon" />
+        <div className="notification-banner-message">
+          <div className="notification-banner-header-row">
+            <p className="notification-banner-title">
+              COMING EVENT - Register Now &amp; Join Us June 26th for Subscribed Live!
+            </p>
+            <div className="notification-banner-header-actions">
+              {pinned ? (
+                <button
+                  aria-expanded={detailsExpanded}
+                  className="notification-banner-detail-toggle"
+                  onClick={onToggleDetails}
+                  type="button"
+                >
+                  {detailsExpanded ? "Hide Detail" : "View Detail"}
+                </button>
+              ) : null}
+              <button
+                className="notification-banner-close"
+                type="button"
+                aria-label="Dismiss notification"
+                onClick={onClose}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          </div>
+          {!showCompactPinned ? (
+            <>
+              <p className="notification-banner-description">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
+                dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
+                ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+                fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt
+                mollit anim .
+              </p>
+              <div className="notification-banner-actions">
+                <button className="notification-banner-action" type="button">
+                  Register Now
+                </button>
+                <button className="notification-banner-action" type="button">
+                  Remind Me Tomorrow
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RevenueProgressToast({
   onClose,
   onViewWidget,
@@ -1456,21 +1991,41 @@ function DashboardGrid({
 
 export function App() {
   const [actionsLayout, setActionsLayout] = useState(getActionsLayout);
+  const [bannerPlacement, setBannerPlacement] = useState(getBannerPlacement);
   const [revenueProgressAdded, setRevenueProgressAdded] = useState(false);
   const [feedbackToastVisible, setFeedbackToastVisible] = useState(false);
   const [feedbackShowViewWidget, setFeedbackShowViewWidget] = useState(false);
   const [widgetDrawerStep, setWidgetDrawerStep] = useState<WidgetDrawerStep>("closed");
   const [widgetSearchQuery, setWidgetSearchQuery] = useState("");
+  const [notificationBannerVisible, setNotificationBannerVisible] = useState(true);
+  const [announcementScrollAnimating, setAnnouncementScrollAnimating] = useState(false);
   const addedWidgetRef = useRef<HTMLElement | null>(null);
   const { progress, scrollRef } = useStickyProgress();
   const surfaceProgress = easeInOut(rangeProgress(progress, 0.08, 0.64));
+  const bannerAffectsHero = notificationBannerVisible;
+  const { bannerAnchorRef, bannerPinned, bannerPinnedShellRef, bannerSlotRef, pinnedBannerHeight } =
+    useBannerPinMotion(bannerPlacement, notificationBannerVisible, scrollRef);
   const titleMorphProgress = easeInOut(rangeProgress(progress, 0.04, 0.76));
   const titleScaleProgress = easeInOut(rangeProgress(progress, 0.02, 0.92));
   const actionsProgress = easeInOut(rangeProgress(progress, 0.18, 0.82));
   const actionsMorphProgress = easeInOut(rangeProgress(progress, 0.04, 0.76));
-  const floatingActionsGeometry = useFloatingActionsGeometry(actionsMorphProgress, actionsLayout);
-  const searchMorphGeometry = useSearchMorphGeometry(actionsMorphProgress);
+  const floatingActionsGeometry = useFloatingActionsGeometry(
+    actionsMorphProgress,
+    actionsLayout,
+    bannerPinned ? pinnedBannerHeight : 0,
+  );
+  const searchMorphGeometry = useSearchMorphGeometry(
+    actionsMorphProgress,
+    bannerAffectsHero,
+    bannerPinned ? pinnedBannerHeight : 0,
+  );
   const welcomeOutProgress = easeInOut(rangeProgress(progress, 0.08, 0.55));
+  const welcomeTitleMorphY = useWelcomeHeroMorphY(bannerAffectsHero);
+  const chipReturnTitleActive = bannerPlacement === "chip-on-scroll" && announcementScrollAnimating;
+  const chipReturnCenterPhase = chipReturnTitleActive ? rangeProgress(0.25 - progress, 0, 0.25) : 0;
+  const effectiveTitleMorphProgress = chipReturnTitleActive
+    ? Math.max(0, 1 - easeInOut(chipReturnCenterPhase))
+    : titleMorphProgress;
 
   const stickyStyle = {
     "--sticky-progress": progress,
@@ -1480,13 +2035,14 @@ export function App() {
     "--configure-button-y": `${(1 - actionsMorphProgress) * 44}px`,
     "--sticky-surface-opacity": surfaceProgress,
     "--sticky-title-opacity": 1,
-    "--title-morph-left": `calc(${50 - titleMorphProgress * 50}% + ${titleMorphProgress * 16}px)`,
+    "--chip-return-center-phase": chipReturnCenterPhase,
+    "--title-morph-left": `calc(${50 - effectiveTitleMorphProgress * 50}% + ${effectiveTitleMorphProgress * 16}px)`,
     "--title-morph-top": "8px",
     "--title-morph-font-size": `${OCCAM_HEADLINE_L_SIZE}px`,
     "--title-morph-line-height": `${OCCAM_HEADLINE_L_LINE_HEIGHT}px`,
     "--sticky-title-scale": 1 - titleScaleProgress * (1 - STICKY_TITLE_SCALE),
-    "--sticky-title-x": `calc(${-50 + titleMorphProgress * 50}%)`,
-    "--sticky-title-y": `${(1 - titleMorphProgress) * 54}px`,
+    "--sticky-title-x": `calc(${-50 + effectiveTitleMorphProgress * 50}%)`,
+    "--sticky-title-y": `${(1 - titleMorphProgress) * welcomeTitleMorphY}px`,
     ...searchMorphGeometry,
     "--sticky-actions-opacity": actionsProgress,
     "--sticky-actions-scale": 1 + (1 - actionsProgress) * 0.025,
@@ -1496,11 +2052,50 @@ export function App() {
     "--sticky-header-y": `${(1 - surfaceProgress) * -6}px`,
     "--welcome-y": `${progress * -44}px`,
     "--welcome-scale": 1 - welcomeOutProgress * 0.035,
+    "--notification-banner-pinned-height": bannerPinned
+      ? `${pinnedBannerHeight}px`
+      : `${NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK}px`,
   } as StickyProgressStyle;
   const stickyControlsActive = progress > 0.48;
+  const bannerChipEligible = useBannerChipVisibility(
+    bannerPlacement,
+    notificationBannerVisible,
+    scrollRef,
+    bannerSlotRef,
+    stickyControlsActive,
+  );
+  const showAnnouncementChip = bannerChipEligible || announcementScrollAnimating;
+  const handleAnnouncementChipClick = () => {
+    const scrollNode = scrollRef.current;
+
+    if (!scrollNode) {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      return;
+    }
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      scrollNode.scrollTop = 0;
+      return;
+    }
+
+    if (announcementScrollAnimating || scrollNode.scrollTop <= 0) {
+      return;
+    }
+
+    const duration = Math.min(900, Math.max(550, scrollNode.scrollTop * 2.2));
+
+    setAnnouncementScrollAnimating(true);
+    void smoothScrollTo(scrollNode, 0, duration).finally(() => {
+      setAnnouncementScrollAnimating(false);
+    });
+  };
   const handleActionsLayoutChange = (nextActionsLayout: ActionsLayout) => {
     setActionsLayout(nextActionsLayout);
     syncActionsLayoutUrl(nextActionsLayout);
+  };
+  const handleBannerPlacementChange = (nextBannerPlacement: BannerPlacement) => {
+    setBannerPlacement(nextBannerPlacement);
+    syncBannerPlacementUrl(nextBannerPlacement);
   };
   const handleOpenAddWidgetPanel = () => {
     setWidgetSearchQuery("");
@@ -1626,16 +2221,31 @@ export function App() {
       <main
         className="homepage-main"
         data-actions-layout={actionsLayout}
+        data-announcement-chip-visible={showAnnouncementChip || undefined}
+        data-announcement-scroll-animating={announcementScrollAnimating || undefined}
+        data-banner-affects-hero={bannerAffectsHero || undefined}
+        data-banner-pinned={bannerPinned || undefined}
+        data-banner-placement={bannerPlacement}
         data-node-id="1:57107"
+        data-notification-visible={notificationBannerVisible || undefined}
         data-sticky-state={progress >= 1 ? "stuck" : "default"}
         ref={scrollRef}
         style={stickyStyle}
         tabIndex={0}
       >
-        <StickyHeader active={stickyControlsActive} />
+        <StickyHeader
+          active={stickyControlsActive}
+          onAnnouncementChipClick={handleAnnouncementChipClick}
+          showAnnouncementChip={showAnnouncementChip}
+        />
         <MorphingSearchField />
         <MorphingFloatingActions onOpenAddWidgetPanel={handleOpenAddWidgetPanel} />
-        <LayoutVersionSelect value={actionsLayout} onChange={handleActionsLayoutChange} />
+        <PrototypeControls
+          actionsLayout={actionsLayout}
+          bannerPlacement={bannerPlacement}
+          onActionsLayoutChange={handleActionsLayoutChange}
+          onBannerPlacementChange={handleBannerPlacementChange}
+        />
         {widgetDrawerStep !== "closed" && (
           <WidgetDrawer
             onAddRevenueProgress={handleConfirmAddRevenueProgress}
@@ -1659,6 +2269,16 @@ export function App() {
           data-node-id="1:57108"
           data-revenue-progress-added={revenueProgressAdded || undefined}
         >
+          {notificationBannerVisible ? (
+            <NotificationBannerRegion
+              anchorRef={bannerAnchorRef}
+              bannerPinned={bannerPinned}
+              bannerPlacement={bannerPlacement}
+              onClose={() => setNotificationBannerVisible(false)}
+              pinnedShellRef={bannerPinnedShellRef}
+              slotRef={bannerSlotRef}
+            />
+          ) : null}
           <WelcomeSearch />
           <DashboardGrid addedWidgetRef={addedWidgetRef} revenueProgressAdded={revenueProgressAdded} />
         </div>
