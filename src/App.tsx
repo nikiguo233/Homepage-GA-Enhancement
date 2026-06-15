@@ -2064,7 +2064,7 @@ export function App() {
     bannerSlotRef,
     stickyControlsActive,
   );
-  const showAnnouncementChip = bannerChipEligible || announcementScrollAnimating;
+  const showAnnouncementChip = bannerChipEligible && !announcementScrollAnimating;
   const handleAnnouncementChipClick = () => {
     const scrollNode = scrollRef.current;
 
@@ -2223,6 +2223,7 @@ export function App() {
         data-actions-layout={actionsLayout}
         data-announcement-chip-visible={showAnnouncementChip || undefined}
         data-announcement-scroll-animating={announcementScrollAnimating || undefined}
+        data-chip-return-centering={chipReturnCenterPhase > 0.001 || undefined}
         data-banner-affects-hero={bannerAffectsHero || undefined}
         data-banner-pinned={bannerPinned || undefined}
         data-banner-placement={bannerPlacement}
