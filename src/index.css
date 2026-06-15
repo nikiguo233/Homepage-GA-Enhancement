@@ -725,7 +725,7 @@ a {
   left: var(--title-morph-left);
   flex: unset;
   width: max-content;
-  max-width: calc(100% - 32px);
+  max-width: min(100%, calc(100% - 684px - 160px));
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: var(--title-morph-font-size);
@@ -736,8 +736,8 @@ a {
   will-change: transform;
 }
 
-.homepage-main[data-banner-placement="chip-on-scroll"][data-announcement-scroll-animating][data-announcement-chip-visible] .announcement-chip {
-  opacity: calc(1 - var(--chip-return-center-phase));
+.homepage-main[data-banner-placement="chip-on-scroll"][data-announcement-scroll-animating][data-chip-return-centering] .homepage-sticky-header h1 {
+  max-width: calc(100% - 32px);
 }
 
 .announcement-chip:hover {
