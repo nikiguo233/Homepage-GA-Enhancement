@@ -43,7 +43,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
   type HTMLAttributes,
   type ReactNode,
   type RefObject,
@@ -51,6 +50,17 @@ import {
 import configureHomepageIconUrl from "./assets/configure-homepage.svg";
 import { AiChatBadge, AiChatPanel } from "./AiChatPanel";
 import { FloatingButton } from "./FloatingButton";
+import {
+  MorphingFloatingActions,
+  MorphingSearchField,
+  StickyHeader,
+  WelcomeSearchHero,
+  smoothScrollTo,
+  useStickyHeaderStyle,
+  useStickyProgress,
+  rangeProgress,
+  type ActionsLayout,
+} from "./sticky-header";
 
 const menuItems = [
   { label: "Dashboard", icon: <DashboardOutlinedIcon /> },
@@ -115,18 +125,9 @@ const notificationAnnouncements = [
   },
 ] as const;
 
-const STICKY_TRANSITION_DISTANCE = 310;
-const WELCOME_TITLE_MORPH_Y = 54;
-const STICKY_HEADER_TITLE_TOP = 8;
-const STICKY_HEADER_HEIGHT = 56;
 const NOTIFICATION_BANNER_MARGIN_TOP = 24;
 const NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK = 136;
-const OCCAM_HEADLINE_L_SIZE = 28;
-const OCCAM_HEADLINE_L_LINE_HEIGHT = 40;
-const OCCAM_TITLE_L_SIZE = 17;
-const STICKY_TITLE_SCALE = OCCAM_TITLE_L_SIZE / OCCAM_HEADLINE_L_SIZE;
 
-type ActionsLayout = "stacked" | "horizontal";
 type BannerPlacement = "default" | "pin-on-scroll" | "chip-on-scroll";
 type WidgetDrawerStep = "closed" | "select" | "configure";
 
@@ -156,87 +157,6 @@ const WIDGET_TYPES = [
     configurable: true,
   },
 ] as const;
-
-type StickyProgressStyle = CSSProperties & {
-  "--sticky-progress": number;
-  "--actions-morph-progress": number;
-  "--morph-actions-top": string;
-  "--morph-actions-right": string;
-  "--configure-button-x": string;
-  "--configure-button-y": string;
-  "--sticky-surface-opacity": number;
-  "--sticky-title-opacity": number;
-  "--title-morph-left": string;
-  "--title-morph-top": string;
-  "--title-morph-font-size": string;
-  "--title-morph-line-height": string;
-  "--sticky-title-scale": number;
-  "--sticky-title-x": string;
-  "--sticky-title-y": string;
-  "--search-morph-left": string;
-  "--search-morph-top": string;
-  "--search-morph-width": string;
-  "--search-morph-height": string;
-  "--search-morph-radius": string;
-  "--search-morph-padding-x": string;
-  "--search-morph-padding-y": string;
-  "--search-morph-border-width": string;
-  "--search-morph-shadow": string;
-  "--sticky-actions-opacity": number;
-  "--sticky-actions-scale": number;
-  "--sticky-actions-x": string;
-  "--sticky-actions-y": string;
-  "--welcome-opacity": number;
-  "--sticky-header-y": string;
-  "--welcome-y": string;
-  "--welcome-scale": number;
-  "--notification-banner-pinned-height": string;
-  "--chip-return-center-phase": number;
-};
-
-function clampStickyProgress(scrollTop: number) {
-  return Math.min(1, Math.max(0, scrollTop / STICKY_TRANSITION_DISTANCE));
-}
-
-function easeInOut(value: number) {
-  return value * value * (3 - 2 * value);
-}
-
-function easeInOutCubic(value: number) {
-  return value < 0.5 ? 4 * value * value * value : 1 - (-2 * value + 2) ** 3 / 2;
-}
-
-function smoothScrollTo(element: HTMLElement, targetTop: number, duration: number) {
-  return new Promise<void>((resolve) => {
-    const startTop = element.scrollTop;
-    const distance = targetTop - startTop;
-
-    if (Math.abs(distance) < 1) {
-      element.scrollTop = targetTop;
-      resolve();
-      return;
-    }
-
-    const startTime = performance.now();
-    let frame = 0;
-
-    const step = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(1, elapsed / duration);
-      element.scrollTop = startTop + distance * easeInOutCubic(progress);
-
-      if (progress < 1) {
-        frame = window.requestAnimationFrame(step);
-        return;
-      }
-
-      element.scrollTop = targetTop;
-      resolve();
-    };
-
-    frame = window.requestAnimationFrame(step);
-  });
-}
 
 function runAfterScrollSettles(scrollNode: HTMLElement, callback: () => void, maxWait = 1500) {
   let settleTimeout = 0;
@@ -283,10 +203,6 @@ function triggerAddedWidgetSpotlight(widget: HTMLElement) {
   widget.addEventListener("animationend", handleAnimationEnd);
 }
 
-function rangeProgress(value: number, start: number, end: number) {
-  return Math.min(1, Math.max(0, (value - start) / (end - start)));
-}
-
 function isElementVisibleInScrollContainer(element: HTMLElement, container: HTMLElement): boolean {
   const elementRect = element.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
@@ -300,66 +216,6 @@ function isElementVisibleInScrollContainer(element: HTMLElement, container: HTML
   }
 
   return visibleHeight >= elementRect.height * 0.5;
-}
-
-function useStickyProgress() {
-  const scrollRef = useRef<HTMLElement | null>(null);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const scrollNode = scrollRef.current;
-
-    if (!scrollNode) {
-      return undefined;
-    }
-
-    let frame = 0;
-
-    const getScrollTop = () =>
-      Math.max(
-        scrollNode.scrollTop,
-        window.scrollY,
-        document.documentElement.scrollTop,
-        document.body.scrollTop,
-      );
-
-    const updateProgress = () => {
-      frame = 0;
-      const nextProgress = clampStickyProgress(getScrollTop());
-      setProgress((currentProgress) =>
-        Math.abs(currentProgress - nextProgress) > 0.002 ? nextProgress : currentProgress,
-      );
-    };
-
-    const scheduleUpdate = () => {
-      if (frame) {
-        return;
-      }
-
-      frame = window.requestAnimationFrame(updateProgress);
-    };
-
-    updateProgress();
-    scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
-
-    return () => {
-      if (frame) {
-        window.cancelAnimationFrame(frame);
-      }
-
-      scrollNode.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-    };
-  }, []);
-
-  return { progress, scrollRef };
-}
-
-function lerp(start: number, end: number, progress: number) {
-  return start + (end - start) * progress;
 }
 
 function getActionsLayout(): ActionsLayout {
@@ -400,262 +256,6 @@ function syncBannerPlacementUrl(bannerPlacement: BannerPlacement) {
   }
 
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-}
-
-function getInitialActionsGeometry(actionsLayout: ActionsLayout = getActionsLayout()) {
-  const compactLayout =
-    typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
-
-  return {
-    "--morph-actions-top": actionsLayout === "horizontal" ? "12px" : compactLayout ? "120px" : "24px",
-    "--morph-actions-right": actionsLayout === "horizontal" ? "16px" : "24px",
-  };
-}
-
-function getHeroFloatingActionsTop(
-  actionsLayout: ActionsLayout,
-  notificationBannerVisible: boolean,
-  bannerPinned: boolean,
-  pinnedBannerHeight: number,
-) {
-  const compactLayout = window.matchMedia("(max-width: 900px)").matches;
-  const baseStartTop = actionsLayout === "horizontal" ? 12 : compactLayout ? 120 : 24;
-
-  if (!notificationBannerVisible || actionsLayout === "horizontal") {
-    return baseStartTop;
-  }
-
-  if (bannerPinned) {
-    return Math.max(baseStartTop, pinnedBannerHeight + 16);
-  }
-
-  const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
-
-  if (!bannerRegion) {
-    return baseStartTop;
-  }
-
-  const bannerRect = bannerRegion.getBoundingClientRect();
-
-  return Math.max(baseStartTop, bannerRect.bottom + 16);
-}
-
-function useFloatingActionsGeometry(
-  progress: number,
-  actionsLayout: ActionsLayout,
-  pinnedBannerHeight: number,
-  aiChatOpen: boolean,
-  notificationBannerVisible: boolean,
-  bannerPinned: boolean,
-) {
-  const [geometry, setGeometry] = useState(() => getInitialActionsGeometry(actionsLayout));
-
-  useLayoutEffect(() => {
-    const updateGeometry = () => {
-      const actionsSlot = document.querySelector<HTMLElement>(".header-actions-slot");
-      const heroStartTop = getHeroFloatingActionsTop(
-        actionsLayout,
-        notificationBannerVisible,
-        bannerPinned,
-        pinnedBannerHeight,
-      );
-
-      if (!actionsSlot) {
-        setGeometry({
-          "--morph-actions-top": `${heroStartTop}px`,
-          "--morph-actions-right": actionsLayout === "horizontal" ? "16px" : "24px",
-        });
-        return;
-      }
-
-      const slotRect = actionsSlot.getBoundingClientRect();
-      const targetRight = window.innerWidth - slotRect.right;
-      const startRight = actionsLayout === "horizontal" ? 16 : 24;
-
-      setGeometry({
-        "--morph-actions-top": `${lerp(heroStartTop, slotRect.top, progress)}px`,
-        "--morph-actions-right": `${lerp(startRight, targetRight, progress)}px`,
-      });
-    };
-
-    updateGeometry();
-    window.addEventListener("resize", updateGeometry);
-
-    const scrollNode = document.querySelector<HTMLElement>(".homepage-main");
-    scrollNode?.addEventListener("scroll", updateGeometry, { passive: true });
-
-    const stickyHeader = document.querySelector<HTMLElement>(".homepage-sticky-header");
-    const pinnedBanner = document.querySelector<HTMLElement>(".notification-banner-fixed");
-    const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
-    const workspace = document.querySelector<HTMLElement>(".homepage-workspace");
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateGeometry) : null;
-
-    resizeObserver?.observe(stickyHeader ?? document.documentElement);
-    resizeObserver?.observe(pinnedBanner ?? document.documentElement);
-    resizeObserver?.observe(bannerRegion ?? document.documentElement);
-    resizeObserver?.observe(workspace ?? document.documentElement);
-
-    return () => {
-      scrollNode?.removeEventListener("scroll", updateGeometry);
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateGeometry);
-    };
-  }, [
-    actionsLayout,
-    aiChatOpen,
-    bannerPinned,
-    notificationBannerVisible,
-    pinnedBannerHeight,
-    progress,
-  ]);
-
-  return geometry;
-}
-
-function useSearchMorphGeometry(
-  progress: number,
-  bannerAffectsHero: boolean,
-  pinnedBannerHeight: number,
-) {
-  const [geometry, setGeometry] = useState({
-    "--search-morph-left": "24px",
-    "--search-morph-top": "116px",
-    "--search-morph-width": "604px",
-    "--search-morph-height": "48px",
-    "--search-morph-radius": "24px",
-    "--search-morph-padding-x": "16px",
-    "--search-morph-padding-y": "4px",
-    "--search-morph-border-width": "0px",
-    "--search-morph-shadow": "var(--occam-elevation-2dp)",
-  });
-
-  useLayoutEffect(() => {
-    const updateGeometry = () => {
-      const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search-placeholder");
-      const stickySearch = document.querySelector<HTMLElement>(".sticky-search-placeholder");
-      const actionsSlot = document.querySelector<HTMLElement>(".header-actions-slot");
-
-      if (!welcomeSearch || !stickySearch) {
-        return;
-      }
-
-      const welcomeRect = welcomeSearch.getBoundingClientRect();
-      const stickyRect = stickySearch.getBoundingClientRect();
-      const actionsSlotRect = actionsSlot?.getBoundingClientRect();
-      const stickyTargetRight = actionsSlotRect ? actionsSlotRect.left - 12 : stickyRect.right;
-      const stickyTargetWidth = Math.max(120, stickyTargetRight - stickyRect.left);
-      const height = lerp(welcomeRect.height, stickyRect.height, progress);
-      const shadowAlpha = (1 - progress) * 0.16;
-      const shadow =
-        shadowAlpha > 0.01
-          ? `0 ${2 * (1 - progress)}px ${6 * (1 - progress)}px rgba(20, 23, 25, ${shadowAlpha})`
-          : "none";
-
-      setGeometry({
-        "--search-morph-left": `${lerp(welcomeRect.left, stickyRect.left, progress)}px`,
-        "--search-morph-top": `${lerp(welcomeRect.top, stickyRect.top, progress)}px`,
-        "--search-morph-width": `${lerp(welcomeRect.width, stickyTargetWidth, progress)}px`,
-        "--search-morph-height": `${height}px`,
-        "--search-morph-radius": `${height / 2}px`,
-        "--search-morph-padding-x": `${lerp(16, 12, progress)}px`,
-        "--search-morph-padding-y": `${lerp(4, 0, progress)}px`,
-        "--search-morph-border-width": `${progress}px`,
-        "--search-morph-shadow": shadow,
-      });
-    };
-
-    updateGeometry();
-
-    const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
-    const pinnedBanner = document.querySelector<HTMLElement>(".notification-banner-fixed");
-    const stickyHeader = document.querySelector<HTMLElement>(".homepage-sticky-header");
-    const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(updateGeometry)
-        : null;
-
-    if (bannerRegion) {
-      resizeObserver?.observe(bannerRegion);
-    }
-
-    if (pinnedBanner) {
-      resizeObserver?.observe(pinnedBanner);
-    }
-
-    if (stickyHeader) {
-      resizeObserver?.observe(stickyHeader);
-    }
-
-    if (welcomeSearch) {
-      resizeObserver?.observe(welcomeSearch);
-    }
-
-    window.addEventListener("resize", updateGeometry);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateGeometry);
-    };
-  }, [bannerAffectsHero, pinnedBannerHeight, progress]);
-
-  return geometry;
-}
-
-function useWelcomeHeroMorphY(bannerAffectsHero: boolean) {
-  const [welcomeTitleMorphY, setWelcomeTitleMorphY] = useState(WELCOME_TITLE_MORPH_Y);
-
-  useLayoutEffect(() => {
-    const getWelcomeHeadingOffset = () => {
-      const main = document.querySelector<HTMLElement>(".homepage-main");
-      const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
-
-      if (!main || !welcomeSearch) {
-        return WELCOME_TITLE_MORPH_Y;
-      }
-
-      let offset = 0;
-      let node: HTMLElement | null = welcomeSearch;
-
-      while (node && node !== main) {
-        offset += node.offsetTop;
-        node = node.offsetParent as HTMLElement | null;
-      }
-
-      return Math.max(WELCOME_TITLE_MORPH_Y, offset - STICKY_HEADER_TITLE_TOP);
-    };
-
-    const updateMorphY = () => {
-      setWelcomeTitleMorphY(getWelcomeHeadingOffset());
-    };
-
-    updateMorphY();
-
-    const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
-    const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(updateMorphY)
-        : null;
-
-    if (bannerRegion) {
-      resizeObserver?.observe(bannerRegion);
-    }
-
-    if (welcomeSearch) {
-      resizeObserver?.observe(welcomeSearch);
-    }
-
-    window.addEventListener("resize", updateMorphY);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateMorphY);
-    };
-  }, [bannerAffectsHero]);
-
-  return welcomeTitleMorphY;
 }
 
 function useBannerPinMotion(
@@ -969,98 +569,10 @@ function GlobalNav() {
   );
 }
 
-function SearchField({
-  className,
-  compact = false,
-  hidden = false,
-  placeholder = "Search in Zuora",
-  tabIndex,
-}: {
-  className?: string;
-  compact?: boolean;
-  hidden?: boolean;
-  placeholder?: string;
-  tabIndex?: number;
-}) {
-  const classes = ["search-field", compact ? "search-field-compact" : "", className].filter(Boolean).join(" ");
-
-  return (
-    <label className={classes} aria-hidden={hidden || undefined}>
-      <SearchIcon />
-      <input aria-label={placeholder} placeholder={placeholder} tabIndex={hidden ? -1 : tabIndex} />
-    </label>
-  );
-}
+const HOMEPAGE_TITLE = "Welcome to Zuora, Rachel Carter";
 
 function ConfigurePageIcon() {
   return <img alt="" aria-hidden="true" className="configure-page-icon" src={configureHomepageIconUrl} />;
-}
-
-function StickyHeader({
-  active,
-  announcementCount,
-  onAnnouncementChipClick,
-  showAnnouncementChip,
-}: {
-  active: boolean;
-  announcementCount: number;
-  onAnnouncementChipClick?: () => void;
-  showAnnouncementChip?: boolean;
-}) {
-  const announcementLabel =
-    announcementCount === 1 ? "1 announcement" : `${announcementCount} announcements`;
-
-  return (
-    <header className="homepage-sticky-header" data-node-id="1:148707" aria-hidden={!active}>
-      <div className="sticky-header-leading">
-        <h1>Welcome to Zuora, Rachel Carter</h1>
-        {showAnnouncementChip ? (
-          <button
-            aria-label={`View ${announcementLabel}`}
-            className="announcement-chip"
-            data-node-id="130:18299"
-            onClick={onAnnouncementChipClick}
-            type="button"
-          >
-            {announcementLabel}
-          </button>
-        ) : null}
-      </div>
-      <div className="sticky-actions">
-        <SearchField className="sticky-search-placeholder" compact hidden />
-        <div className="header-actions-slot" data-node-id="1:148714" aria-hidden="true" />
-      </div>
-    </header>
-  );
-}
-
-function MorphingSearchField() {
-  return <SearchField className="morphing-search-control" />;
-}
-
-function MorphingFloatingActions({ onOpenAddWidgetPanel }: { onOpenAddWidgetPanel: () => void }) {
-  return (
-    <div className="morphing-floating-actions" data-node-id="1:139205">
-      <FloatingButton
-        aria-label="Configure homepage"
-        className="morphing-floating-button morphing-floating-button-configure"
-        icon={<ConfigurePageIcon />}
-        shape="circular"
-        size="small"
-        theme="light"
-        variant="secondary"
-      />
-      <FloatingButton
-        aria-label="Add widget"
-        className="morphing-floating-button morphing-floating-button-create"
-        icon={<AddIcon />}
-        onClick={onOpenAddWidgetPanel}
-        shape="circular"
-        size="small"
-        theme="light"
-      />
-    </div>
-  );
 }
 
 function BannerPlacementSelect({
@@ -1097,15 +609,6 @@ function PrototypeControls({
     <div className="prototype-controls">
       <BannerPlacementSelect value={bannerPlacement} onChange={onBannerPlacementChange} />
     </div>
-  );
-}
-
-function WelcomeSearch() {
-  return (
-    <section className="welcome-search" data-node-id="1:57109">
-      <h2>Welcome to Zuora, Rachel Carter</h2>
-      <SearchField className="welcome-search-placeholder" hidden />
-    </section>
   );
 }
 
@@ -2201,65 +1704,26 @@ export function App() {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const addedWidgetRef = useRef<HTMLElement | null>(null);
   const { progress, scrollRef } = useStickyProgress();
-  const surfaceProgress = easeInOut(rangeProgress(progress, 0.08, 0.64));
   const bannerAffectsHero = notificationBannerVisible;
   const { bannerAnchorRef, bannerPinned, bannerPinnedShellRef, bannerSlotRef, pinnedBannerHeight } =
     useBannerPinMotion(bannerPlacement, notificationBannerVisible, scrollRef);
-  const titleMorphProgress = easeInOut(rangeProgress(progress, 0.04, 0.76));
-  const titleScaleProgress = easeInOut(rangeProgress(progress, 0.02, 0.92));
-  const actionsProgress = easeInOut(rangeProgress(progress, 0.18, 0.82));
-  const actionsMorphProgress = easeInOut(rangeProgress(progress, 0.04, 0.76));
-  const floatingActionsGeometry = useFloatingActionsGeometry(
-    actionsMorphProgress,
-    actionsLayout,
-    bannerPinned ? pinnedBannerHeight : 0,
-    aiChatOpen,
-    notificationBannerVisible,
-    bannerPinned,
-  );
-  const searchMorphGeometry = useSearchMorphGeometry(
-    actionsMorphProgress,
-    bannerAffectsHero,
-    bannerPinned ? pinnedBannerHeight : 0,
-  );
-  const welcomeOutProgress = easeInOut(rangeProgress(progress, 0.08, 0.55));
-  const welcomeTitleMorphY = useWelcomeHeroMorphY(bannerAffectsHero);
   const chipReturnTitleActive = bannerPlacement === "chip-on-scroll" && announcementScrollAnimating;
   const chipReturnCenterPhase = chipReturnTitleActive ? rangeProgress(0.25 - progress, 0, 0.25) : 0;
-  const effectiveTitleMorphProgress = chipReturnTitleActive
-    ? Math.max(0, 1 - easeInOut(chipReturnCenterPhase))
-    : titleMorphProgress;
-
-  const stickyStyle = {
-    "--sticky-progress": progress,
-    "--actions-morph-progress": actionsMorphProgress,
-    ...floatingActionsGeometry,
-    "--configure-button-x": `${(1 - actionsMorphProgress) * 44}px`,
-    "--configure-button-y": `${(1 - actionsMorphProgress) * 44}px`,
-    "--sticky-surface-opacity": surfaceProgress,
-    "--sticky-title-opacity": 1,
-    "--chip-return-center-phase": chipReturnCenterPhase,
-    "--title-morph-left": `calc(${50 - effectiveTitleMorphProgress * 50}% + ${effectiveTitleMorphProgress * 16}px)`,
-    "--title-morph-top": "8px",
-    "--title-morph-font-size": `${OCCAM_HEADLINE_L_SIZE}px`,
-    "--title-morph-line-height": `${OCCAM_HEADLINE_L_LINE_HEIGHT}px`,
-    "--sticky-title-scale": 1 - titleScaleProgress * (1 - STICKY_TITLE_SCALE),
-    "--sticky-title-x": `calc(${-50 + effectiveTitleMorphProgress * 50}%)`,
-    "--sticky-title-y": `${(1 - titleMorphProgress) * welcomeTitleMorphY}px`,
-    ...searchMorphGeometry,
-    "--sticky-actions-opacity": actionsProgress,
-    "--sticky-actions-scale": 1 + (1 - actionsProgress) * 0.025,
-    "--sticky-actions-x": `${(1 - actionsProgress) * -15}vw`,
-    "--sticky-actions-y": `${(1 - actionsProgress) * 88}px`,
-    "--welcome-opacity": 1 - welcomeOutProgress,
-    "--sticky-header-y": `${(1 - surfaceProgress) * -6}px`,
-    "--welcome-y": `${progress * -44}px`,
-    "--welcome-scale": 1 - welcomeOutProgress * 0.035,
-    "--notification-banner-pinned-height": bannerPinned
-      ? `${pinnedBannerHeight}px`
-      : `${NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK}px`,
-  } as StickyProgressStyle;
-  const stickyControlsActive = progress > 0.48;
+  const { measurementRefs, stickyStyle, stickyControlsActive } = useStickyHeaderStyle(
+    progress,
+    scrollRef,
+    {
+      actionsLayout,
+      notificationBannerVisible,
+      bannerPinned,
+      pinnedBannerHeight: bannerPinned ? pinnedBannerHeight : NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK,
+      chipReturnTitleActive,
+      measurementRefs: {
+        bannerRegionRef: bannerAnchorRef,
+        pinnedBannerRef: bannerPinnedShellRef,
+      },
+    },
+  );
   const bannerChipEligible = useBannerChipVisibility(
     bannerPlacement,
     notificationBannerVisible,
@@ -2451,11 +1915,34 @@ export function App() {
         <StickyHeader
           active={stickyControlsActive}
           announcementCount={notificationAnnouncements.length}
+          headerActionsSlotRef={measurementRefs.headerActionsSlotRef}
           onAnnouncementChipClick={handleAnnouncementChipClick}
           showAnnouncementChip={showAnnouncementChip}
+          stickyHeaderRef={measurementRefs.stickyHeaderRef}
+          stickySearchPlaceholderRef={measurementRefs.stickySearchPlaceholderRef}
+          title={HOMEPAGE_TITLE}
         />
         <MorphingSearchField />
-        <MorphingFloatingActions onOpenAddWidgetPanel={handleOpenAddWidgetPanel} />
+        <MorphingFloatingActions>
+          <FloatingButton
+            aria-label="Configure homepage"
+            className="morphing-floating-button morphing-floating-button-configure"
+            icon={<ConfigurePageIcon />}
+            shape="circular"
+            size="small"
+            theme="light"
+            variant="secondary"
+          />
+          <FloatingButton
+            aria-label="Add widget"
+            className="morphing-floating-button morphing-floating-button-create"
+            icon={<AddIcon />}
+            onClick={handleOpenAddWidgetPanel}
+            shape="circular"
+            size="small"
+            theme="light"
+          />
+        </MorphingFloatingActions>
         <PrototypeControls
           bannerPlacement={bannerPlacement}
           onBannerPlacementChange={handleBannerPlacementChange}
@@ -2493,7 +1980,11 @@ export function App() {
               slotRef={bannerSlotRef}
             />
           ) : null}
-          <WelcomeSearch />
+          <WelcomeSearchHero
+            title={HOMEPAGE_TITLE}
+            welcomeSearchPlaceholderRef={measurementRefs.welcomeSearchPlaceholderRef}
+            welcomeSearchRef={measurementRefs.welcomeSearchRef}
+          />
           <DashboardGrid addedWidgetRef={addedWidgetRef} revenueProgressAdded={revenueProgressAdded} />
         </div>
         </main>

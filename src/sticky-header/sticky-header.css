@@ -1,0 +1,4 @@
+/* Sticky header transition styles.
+ * In this prototype, the full rules live in src/index.css (search: homepage-sticky-header).
+ * When copying this module to another app, move those rules here or import this file after tokens. */
+@import "./sticky-header-styles.css";
