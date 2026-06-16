@@ -985,11 +985,11 @@ a {
 }
 
 .notification-banner {
-  position: static;
+  position: relative;
   z-index: 7;
   width: 100%;
   margin: 0;
-  padding: 16px 20px;
+  padding: 8px 20px;
   border: 1px solid var(--occam-light-theme-info);
   border-radius: 4px;
   background: var(--occam-color-blue-050);
@@ -1028,6 +1028,111 @@ a {
   border-radius: 0;
 }
 
+.notification-banner-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.notification-banner-pinned .notification-banner-layout {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  column-gap: 4px;
+  align-items: center;
+}
+
+.notification-banner-pinned .notification-banner-pagination {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.notification-banner-pinned .notification-banner-controls {
+  display: inline-flex;
+  grid-column: 3;
+  grid-row: 1;
+  gap: 8px;
+  align-items: center;
+}
+
+.notification-banner-pinned .icon-button.notification-banner-close {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.notification-banner-pinned .notification-banner-detail-toggle {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.notification-banner-pinned.notification-banner-compact .notification-banner-message {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.notification-banner-pinned:not(.notification-banner-compact) .notification-banner-message {
+  grid-column: 1 / 3;
+  grid-row: 2;
+  align-self: start;
+}
+
+.notification-banner-pagination {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.notification-banner-pagination-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--occam-color-cool-gray-800);
+  cursor: pointer;
+}
+
+.notification-banner-pagination-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.notification-banner-pagination-button:hover:not(:disabled) {
+  background: var(--occam-blue-hover);
+}
+
+.notification-banner-pagination-button:active:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--occam-light-theme-links-enabled) 16%,
+    transparent
+  );
+}
+
+.notification-banner-pagination-button:focus-visible {
+  outline: 2px solid var(--occam-blue-focus);
+  outline-offset: 2px;
+}
+
+.notification-banner-pagination-button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.notification-banner-pagination-count {
+  padding: 8px;
+  color: var(--occam-text-secondary);
+  font-size: var(--font-title-m-size);
+  font-weight: 500;
+  line-height: var(--font-title-m-line-height);
+  letter-spacing: var(--font-title-m-letter-spacing);
+  white-space: nowrap;
+}
+
 .notification-banner-content {
   display: flex;
   gap: 8px;
@@ -1056,34 +1161,23 @@ a {
   align-items: flex-start;
 }
 
-.notification-banner-header-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: 16px;
-  align-items: center;
-}
-
-.notification-banner-compact .notification-banner-content {
-  align-items: center;
-}
-
-.notification-banner-compact .notification-banner-icon {
-  margin-top: 0;
-}
-
 .notification-banner-compact .notification-banner-header-row {
   align-items: center;
+}
+
+.notification-banner-compact .notification-banner-message {
+  padding-right: 0;
+}
+
+.notification-banner-compact {
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 .notification-banner-compact .notification-banner-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.notification-banner-compact {
-  padding-top: 12px;
-  padding-bottom: 12px;
 }
 
 .notification-banner-detail-toggle {
@@ -1118,32 +1212,36 @@ a {
   letter-spacing: var(--font-title-m-letter-spacing);
 }
 
-.notification-banner-close {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-top: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--occam-color-cool-gray-500);
-  cursor: pointer;
+.icon-button.notification-banner-close {
+  position: absolute;
+  top: 8px;
+  right: 20px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--occam-color-cool-gray-800);
 }
 
-.notification-banner-close svg {
-  width: 16px;
-  height: 16px;
+.icon-button.notification-banner-close svg {
+  width: 20px;
+  height: 20px;
+  color: inherit;
 }
 
-.notification-banner-close:hover {
-  color: var(--occam-text-primary);
+.icon-button.notification-banner-close:hover {
+  background: var(--occam-blue-hover);
 }
 
-.notification-banner-close:focus-visible {
+.icon-button.notification-banner-close:active {
+  background: color-mix(
+    in srgb,
+    var(--occam-light-theme-links-enabled) 16%,
+    transparent
+  );
+}
+
+.icon-button.notification-banner-close:focus-visible {
   outline: 2px solid var(--occam-blue-focus);
   outline-offset: 2px;
 }
