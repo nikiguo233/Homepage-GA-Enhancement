@@ -9,6 +9,7 @@ import CalculateOutlinedIcon from "@mui/icons-material/CalculateOutlined";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import CheckBoxOutlineBlankOutlinedIcon from "@mui/icons-material/CheckBoxOutlineBlankOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
@@ -95,6 +96,23 @@ const sspBatches = [
   ["vCPU Edition", "FY25 vCPU Edition", "10000005"],
   ["Product Family", "FY23 Product Family", "10000006"],
   ["Perpetual License", "FY21 Perpetual License", "10000007"],
+] as const;
+
+const notificationAnnouncements = [
+  {
+    title: "COMING EVENT - Register Now & Join Us June 26th for Subscribed Live!",
+    description:
+      "Subscribed Live is Zuora's flagship event for subscription business leaders. Join us on June 26th for keynotes, product roadmap previews, and sessions on billing automation, usage-based pricing, and revenue recognition. Connect with peers and Zuora experts to learn how leading companies are growing recurring revenue.",
+    primaryAction: "Register Now",
+    secondaryAction: "Remind Me Tomorrow",
+  },
+  {
+    title: "Scheduled Maintenance - Revenue Cloud will be unavailable June 20th from 2:00–4:00 AM PT",
+    description:
+      "We are performing scheduled maintenance to improve system performance and reliability. During this window, Revenue Cloud features including reporting, batch processing, and file uploads will be temporarily unavailable. Please plan accordingly and save any in-progress work before the maintenance window begins.",
+    primaryAction: "View Maintenance Details",
+    secondaryAction: "Remind Me Tomorrow",
+  },
 ] as const;
 
 const STICKY_TRANSITION_DISTANCE = 310;
@@ -805,9 +823,27 @@ function useBannerChipVisibility(
   );
 }
 
-function IconButton({ children, label }: { children: ReactNode; label: string }) {
+function IconButton({
+  children,
+  className,
+  label,
+  onClick,
+}: {
+  children: ReactNode;
+  className?: string;
+  label: string;
+  onClick?: () => void;
+}) {
+  const classNames = ["icon-button", className].filter(Boolean).join(" ");
+
   return (
-    <button className="icon-button" type="button" aria-label={label} title={label}>
+    <button
+      className={classNames}
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
       {children}
     </button>
   );
@@ -962,26 +998,31 @@ function ConfigurePageIcon() {
 
 function StickyHeader({
   active,
+  announcementCount,
   onAnnouncementChipClick,
   showAnnouncementChip,
 }: {
   active: boolean;
+  announcementCount: number;
   onAnnouncementChipClick?: () => void;
   showAnnouncementChip?: boolean;
 }) {
+  const announcementLabel =
+    announcementCount === 1 ? "1 announcement" : `${announcementCount} announcements`;
+
   return (
     <header className="homepage-sticky-header" data-node-id="1:148707" aria-hidden={!active}>
       <div className="sticky-header-leading">
         <h1>Welcome to Zuora, Rachel Carter</h1>
         {showAnnouncementChip ? (
           <button
-            aria-label="View 1 announcement"
+            aria-label={`View ${announcementLabel}`}
             className="announcement-chip"
             data-node-id="130:18299"
             onClick={onAnnouncementChipClick}
             type="button"
           >
-            1 announcement
+            {announcementLabel}
           </button>
         ) : null}
       </div>
@@ -1887,6 +1928,48 @@ function WidgetDrawer({
   );
 }
 
+function NotificationBannerPagination({
+  activeIndex,
+  total,
+  onPrevious,
+  onNext,
+}: {
+  activeIndex: number;
+  total: number;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  if (total <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="notification-banner-pagination" data-node-id="188:21387">
+      <button
+        aria-label="Previous notification"
+        className="notification-banner-pagination-button"
+        disabled={activeIndex <= 0}
+        onClick={onPrevious}
+        type="button"
+      >
+        <ChevronLeftIcon />
+      </button>
+      <span className="notification-banner-pagination-count">
+        {activeIndex + 1} of {total}
+      </span>
+      <button
+        aria-label="Next notification"
+        className="notification-banner-pagination-button"
+        disabled={activeIndex >= total - 1}
+        onClick={onNext}
+        type="button"
+      >
+        <ChevronRightIcon />
+      </button>
+    </div>
+  );
+}
+
 function NotificationBannerRegion({
   bannerPlacement,
   bannerPinned,
@@ -1902,14 +1985,24 @@ function NotificationBannerRegion({
   pinnedShellRef: RefObject<HTMLDivElement | null>;
   slotRef: RefObject<HTMLDivElement | null>;
 }) {
+  const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const showPinnedOverlay = bannerPlacement === "pin-on-scroll" && bannerPinned;
+  const totalAnnouncements = notificationAnnouncements.length;
 
   useEffect(() => {
     if (!showPinnedOverlay) {
       setDetailsExpanded(false);
     }
   }, [showPinnedOverlay]);
+
+  const handlePreviousAnnouncement = () => {
+    setActiveAnnouncementIndex((current) => Math.max(0, current - 1));
+  };
+
+  const handleNextAnnouncement = () => {
+    setActiveAnnouncementIndex((current) => Math.min(totalAnnouncements - 1, current + 1));
+  };
 
   return (
     <div className="notification-banner-region" ref={anchorRef}>
@@ -1918,7 +2011,13 @@ function NotificationBannerRegion({
         className="notification-banner-slot"
         ref={slotRef}
       >
-        <NotificationBanner onClose={onClose} />
+        <NotificationBanner
+          activeIndex={activeAnnouncementIndex}
+          onClose={onClose}
+          onNext={handleNextAnnouncement}
+          onPrevious={handlePreviousAnnouncement}
+          total={totalAnnouncements}
+        />
       </div>
       {bannerPlacement === "pin-on-scroll" ? (
         <div
@@ -1927,10 +2026,14 @@ function NotificationBannerRegion({
           ref={pinnedShellRef}
         >
           <NotificationBanner
+            activeIndex={activeAnnouncementIndex}
             detailsExpanded={detailsExpanded}
             onClose={onClose}
+            onNext={handleNextAnnouncement}
+            onPrevious={handlePreviousAnnouncement}
             onToggleDetails={() => setDetailsExpanded((current) => !current)}
             pinned
+            total={totalAnnouncements}
           />
         </div>
       ) : null}
@@ -1939,16 +2042,25 @@ function NotificationBannerRegion({
 }
 
 function NotificationBanner({
+  activeIndex,
   detailsExpanded = false,
   onClose,
+  onNext,
+  onPrevious,
   onToggleDetails,
   pinned = false,
+  total,
 }: {
+  activeIndex: number;
   detailsExpanded?: boolean;
   onClose: () => void;
+  onNext: () => void;
+  onPrevious: () => void;
   onToggleDetails?: () => void;
   pinned?: boolean;
+  total: number;
 }) {
+  const announcement = notificationAnnouncements[activeIndex];
   const showCompactPinned = pinned && !detailsExpanded;
   const bannerClassName = [
     "notification-banner",
@@ -1962,58 +2074,63 @@ function NotificationBanner({
   return (
     <div
       className={bannerClassName}
-      data-node-id="125:15457"
+      data-node-id={pinned ? "188:21487" : "188:21228"}
       role="region"
       aria-label="Notification"
     >
-      <div className="notification-banner-content">
-        <InfoOutlinedIcon aria-hidden="true" className="notification-banner-icon" />
+      {!pinned ? (
+        <IconButton
+          className="notification-banner-close"
+          label="Dismiss notification"
+          onClick={onClose}
+        >
+          <CloseIcon />
+        </IconButton>
+      ) : null}
+      <div className="notification-banner-layout">
+        <NotificationBannerPagination
+          activeIndex={activeIndex}
+          onNext={onNext}
+          onPrevious={onPrevious}
+          total={total}
+        />
         <div className="notification-banner-message">
           <div className="notification-banner-header-row">
-            <p className="notification-banner-title">
-              COMING EVENT - Register Now &amp; Join Us June 26th for Subscribed Live!
-            </p>
-            <div className="notification-banner-header-actions">
-              {pinned ? (
-                <button
-                  aria-expanded={detailsExpanded}
-                  className="notification-banner-detail-toggle"
-                  onClick={onToggleDetails}
-                  type="button"
-                >
-                  {detailsExpanded ? "Hide Detail" : "View Detail"}
-                </button>
-              ) : null}
-              <button
-                className="notification-banner-close"
-                type="button"
-                aria-label="Dismiss notification"
-                onClick={onClose}
-              >
-                <CloseIcon />
-              </button>
-            </div>
+            <p className="notification-banner-title">{announcement.title}</p>
           </div>
           {!showCompactPinned ? (
             <>
-              <p className="notification-banner-description">
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et
-                dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-                ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt
-                mollit anim .
-              </p>
+              <p className="notification-banner-description">{announcement.description}</p>
               <div className="notification-banner-actions">
                 <button className="notification-banner-action" type="button">
-                  Register Now
+                  {announcement.primaryAction}
                 </button>
                 <button className="notification-banner-action" type="button">
-                  Remind Me Tomorrow
+                  {announcement.secondaryAction}
                 </button>
               </div>
             </>
           ) : null}
         </div>
+        {pinned ? (
+          <div className="notification-banner-controls">
+            <button
+              aria-expanded={detailsExpanded}
+              className="notification-banner-detail-toggle"
+              onClick={onToggleDetails}
+              type="button"
+            >
+              {detailsExpanded ? "Hide Detail" : "View Detail"}
+            </button>
+            <IconButton
+              className="notification-banner-close"
+              label="Dismiss notification"
+              onClick={onClose}
+            >
+              <CloseIcon />
+            </IconButton>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -2333,6 +2450,7 @@ export function App() {
         >
         <StickyHeader
           active={stickyControlsActive}
+          announcementCount={notificationAnnouncements.length}
           onAnnouncementChipClick={handleAnnouncementChipClick}
           showAnnouncementChip={showAnnouncementChip}
         />
