@@ -353,18 +353,6 @@ function getActionsLayout(): ActionsLayout {
   return params.get("variant") === "horizontal-buttons" ? "horizontal" : "stacked";
 }
 
-function syncActionsLayoutUrl(actionsLayout: ActionsLayout) {
-  const url = new URL(window.location.href);
-
-  if (actionsLayout === "horizontal") {
-    url.searchParams.set("variant", "horizontal-buttons");
-  } else {
-    url.searchParams.delete("variant");
-  }
-
-  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-}
-
 function getBannerPlacement(): BannerPlacement {
   if (typeof window === "undefined") {
     return "default";
@@ -1034,28 +1022,6 @@ function MorphingFloatingActions({ onOpenAddWidgetPanel }: { onOpenAddWidgetPane
   );
 }
 
-function LayoutVersionSelect({
-  value,
-  onChange,
-}: {
-  value: ActionsLayout;
-  onChange: (value: ActionsLayout) => void;
-}) {
-  return (
-    <label className="prototype-control">
-      <span>Buttons</span>
-      <select
-        aria-label="Button layout version"
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value as ActionsLayout)}
-      >
-        <option value="stacked">Default</option>
-        <option value="horizontal">Horizontal</option>
-      </select>
-    </label>
-  );
-}
-
 function BannerPlacementSelect({
   value,
   onChange,
@@ -1080,20 +1046,15 @@ function BannerPlacementSelect({
 }
 
 function PrototypeControls({
-  actionsLayout,
   bannerPlacement,
-  onActionsLayoutChange,
   onBannerPlacementChange,
 }: {
-  actionsLayout: ActionsLayout;
   bannerPlacement: BannerPlacement;
-  onActionsLayoutChange: (value: ActionsLayout) => void;
   onBannerPlacementChange: (value: BannerPlacement) => void;
 }) {
   return (
     <div className="prototype-controls">
       <BannerPlacementSelect value={bannerPlacement} onChange={onBannerPlacementChange} />
-      <LayoutVersionSelect value={actionsLayout} onChange={onActionsLayoutChange} />
     </div>
   );
 }
@@ -2111,7 +2072,7 @@ function DashboardGrid({
 }
 
 export function App() {
-  const [actionsLayout, setActionsLayout] = useState(getActionsLayout);
+  const [actionsLayout] = useState(getActionsLayout);
   const [bannerPlacement, setBannerPlacement] = useState(getBannerPlacement);
   const [revenueProgressAdded, setRevenueProgressAdded] = useState(false);
   const [feedbackToastVisible, setFeedbackToastVisible] = useState(false);
@@ -2213,10 +2174,6 @@ export function App() {
     void smoothScrollTo(scrollNode, 0, duration).finally(() => {
       setAnnouncementScrollAnimating(false);
     });
-  };
-  const handleActionsLayoutChange = (nextActionsLayout: ActionsLayout) => {
-    setActionsLayout(nextActionsLayout);
-    syncActionsLayoutUrl(nextActionsLayout);
   };
   const handleBannerPlacementChange = (nextBannerPlacement: BannerPlacement) => {
     setBannerPlacement(nextBannerPlacement);
@@ -2382,9 +2339,7 @@ export function App() {
         <MorphingSearchField />
         <MorphingFloatingActions onOpenAddWidgetPanel={handleOpenAddWidgetPanel} />
         <PrototypeControls
-          actionsLayout={actionsLayout}
           bannerPlacement={bannerPlacement}
-          onActionsLayoutChange={handleActionsLayoutChange}
           onBannerPlacementChange={handleBannerPlacementChange}
         />
         {widgetDrawerStep !== "closed" && (
