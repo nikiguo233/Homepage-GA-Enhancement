@@ -48,6 +48,7 @@ import {
   type RefObject,
 } from "react";
 import configureHomepageIconUrl from "./assets/configure-homepage.svg";
+import { AiChatBadge, AiChatPanel } from "./AiChatPanel";
 import { FloatingButton } from "./FloatingButton";
 
 const menuItems = [
@@ -405,33 +406,68 @@ function getInitialActionsGeometry(actionsLayout: ActionsLayout = getActionsLayo
   };
 }
 
+function getHeroFloatingActionsTop(
+  actionsLayout: ActionsLayout,
+  notificationBannerVisible: boolean,
+  bannerPinned: boolean,
+  pinnedBannerHeight: number,
+) {
+  const compactLayout = window.matchMedia("(max-width: 900px)").matches;
+  const baseStartTop = actionsLayout === "horizontal" ? 12 : compactLayout ? 120 : 24;
+
+  if (!notificationBannerVisible || actionsLayout === "horizontal") {
+    return baseStartTop;
+  }
+
+  if (bannerPinned) {
+    return Math.max(baseStartTop, pinnedBannerHeight + 16);
+  }
+
+  const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
+
+  if (!bannerRegion) {
+    return baseStartTop;
+  }
+
+  const bannerRect = bannerRegion.getBoundingClientRect();
+
+  return Math.max(baseStartTop, bannerRect.bottom + 16);
+}
+
 function useFloatingActionsGeometry(
   progress: number,
   actionsLayout: ActionsLayout,
   pinnedBannerHeight: number,
+  aiChatOpen: boolean,
+  notificationBannerVisible: boolean,
+  bannerPinned: boolean,
 ) {
   const [geometry, setGeometry] = useState(() => getInitialActionsGeometry(actionsLayout));
 
   useLayoutEffect(() => {
     const updateGeometry = () => {
       const actionsSlot = document.querySelector<HTMLElement>(".header-actions-slot");
-      const compactLayout = window.matchMedia("(max-width: 900px)").matches;
-      const startTop = actionsLayout === "horizontal" ? 12 : compactLayout ? 120 : 24;
-      const startRight = actionsLayout === "horizontal" ? 16 : 24;
+      const heroStartTop = getHeroFloatingActionsTop(
+        actionsLayout,
+        notificationBannerVisible,
+        bannerPinned,
+        pinnedBannerHeight,
+      );
 
       if (!actionsSlot) {
         setGeometry({
-          "--morph-actions-top": `${startTop}px`,
-          "--morph-actions-right": `${startRight}px`,
+          "--morph-actions-top": `${heroStartTop}px`,
+          "--morph-actions-right": actionsLayout === "horizontal" ? "16px" : "24px",
         });
         return;
       }
 
       const slotRect = actionsSlot.getBoundingClientRect();
       const targetRight = window.innerWidth - slotRect.right;
+      const startRight = actionsLayout === "horizontal" ? 16 : 24;
 
       setGeometry({
-        "--morph-actions-top": `${lerp(startTop, slotRect.top, progress)}px`,
+        "--morph-actions-top": `${lerp(heroStartTop, slotRect.top, progress)}px`,
         "--morph-actions-right": `${lerp(startRight, targetRight, progress)}px`,
       });
     };
@@ -439,19 +475,34 @@ function useFloatingActionsGeometry(
     updateGeometry();
     window.addEventListener("resize", updateGeometry);
 
+    const scrollNode = document.querySelector<HTMLElement>(".homepage-main");
+    scrollNode?.addEventListener("scroll", updateGeometry, { passive: true });
+
     const stickyHeader = document.querySelector<HTMLElement>(".homepage-sticky-header");
     const pinnedBanner = document.querySelector<HTMLElement>(".notification-banner-fixed");
+    const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
+    const workspace = document.querySelector<HTMLElement>(".homepage-workspace");
     const resizeObserver =
       typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateGeometry) : null;
 
     resizeObserver?.observe(stickyHeader ?? document.documentElement);
     resizeObserver?.observe(pinnedBanner ?? document.documentElement);
+    resizeObserver?.observe(bannerRegion ?? document.documentElement);
+    resizeObserver?.observe(workspace ?? document.documentElement);
 
     return () => {
+      scrollNode?.removeEventListener("scroll", updateGeometry);
       resizeObserver?.disconnect();
       window.removeEventListener("resize", updateGeometry);
     };
-  }, [actionsLayout, pinnedBannerHeight, progress]);
+  }, [
+    actionsLayout,
+    aiChatOpen,
+    bannerPinned,
+    notificationBannerVisible,
+    pinnedBannerHeight,
+    progress,
+  ]);
 
   return geometry;
 }
@@ -1317,28 +1368,30 @@ function RunReport() {
           <RefreshOutlinedIcon />
         </button>
       </div>
-      <table className="downloads-table">
-        <thead>
-          <tr>
-            <th>Report ID</th>
-            <th>Report Name</th>
-            <th>Completion Time</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {reports.map(([id, name, time]) => (
-            <tr key={id}>
-              <td>{id}</td>
-              <td>{name}</td>
-              <td>{time}</td>
-              <td>
-                <FileDownloadOutlinedIcon />
-              </td>
+      <div className="widget-table-wrap">
+        <table className="downloads-table">
+          <thead>
+            <tr>
+              <th>Report ID</th>
+              <th>Report Name</th>
+              <th>Completion Time</th>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {reports.map(([id, name, time]) => (
+              <tr key={id}>
+                <td>{id}</td>
+                <td>{name}</td>
+                <td>{time}</td>
+                <td>
+                  <FileDownloadOutlinedIcon />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <button className="text-link" type="button">
         View All Downloads
       </button>
@@ -2067,6 +2120,7 @@ export function App() {
   const [widgetSearchQuery, setWidgetSearchQuery] = useState("");
   const [notificationBannerVisible, setNotificationBannerVisible] = useState(true);
   const [announcementScrollAnimating, setAnnouncementScrollAnimating] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const addedWidgetRef = useRef<HTMLElement | null>(null);
   const { progress, scrollRef } = useStickyProgress();
   const surfaceProgress = easeInOut(rangeProgress(progress, 0.08, 0.64));
@@ -2081,6 +2135,9 @@ export function App() {
     actionsMorphProgress,
     actionsLayout,
     bannerPinned ? pinnedBannerHeight : 0,
+    aiChatOpen,
+    notificationBannerVisible,
+    bannerPinned,
   );
   const searchMorphGeometry = useSearchMorphGeometry(
     actionsMorphProgress,
@@ -2293,25 +2350,30 @@ export function App() {
     };
   }, [feedbackToastVisible, revenueProgressAdded, scrollRef]);
 
+  useEffect(() => {
+    window.dispatchEvent(new Event("resize"));
+  }, [aiChatOpen]);
+
   return (
-    <div className="nebula-shell">
+    <div className="nebula-shell" data-ai-chat-open={aiChatOpen || undefined}>
       <GlobalNav />
-      <main
-        className="homepage-main"
-        data-actions-layout={actionsLayout}
-        data-announcement-chip-visible={showAnnouncementChip || undefined}
-        data-announcement-scroll-animating={announcementScrollAnimating || undefined}
-        data-chip-return-centering={chipReturnCenterPhase > 0.001 || undefined}
-        data-banner-affects-hero={bannerAffectsHero || undefined}
-        data-banner-pinned={bannerPinned || undefined}
-        data-banner-placement={bannerPlacement}
-        data-node-id="1:57107"
-        data-notification-visible={notificationBannerVisible || undefined}
-        data-sticky-state={progress >= 1 ? "stuck" : "default"}
-        ref={scrollRef}
-        style={stickyStyle}
-        tabIndex={0}
-      >
+      <div className="homepage-workspace">
+        <main
+          className="homepage-main"
+          data-actions-layout={actionsLayout}
+          data-announcement-chip-visible={showAnnouncementChip || undefined}
+          data-announcement-scroll-animating={announcementScrollAnimating || undefined}
+          data-chip-return-centering={chipReturnCenterPhase > 0.001 || undefined}
+          data-banner-affects-hero={bannerAffectsHero || undefined}
+          data-banner-pinned={bannerPinned || undefined}
+          data-banner-placement={bannerPlacement}
+          data-node-id="1:57107"
+          data-notification-visible={notificationBannerVisible || undefined}
+          data-sticky-state={progress >= 1 ? "stuck" : "default"}
+          ref={scrollRef}
+          style={stickyStyle}
+          tabIndex={0}
+        >
         <StickyHeader
           active={stickyControlsActive}
           onAnnouncementChipClick={handleAnnouncementChipClick}
@@ -2361,7 +2423,10 @@ export function App() {
           <WelcomeSearch />
           <DashboardGrid addedWidgetRef={addedWidgetRef} revenueProgressAdded={revenueProgressAdded} />
         </div>
-      </main>
+        </main>
+        <AiChatPanel onClose={() => setAiChatOpen(false)} open={aiChatOpen} />
+      </div>
+      {!aiChatOpen ? <AiChatBadge onClick={() => setAiChatOpen(true)} /> : null}
     </div>
   );
 }
