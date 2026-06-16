@@ -1,0 +1,10 @@
+<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M3.3372 2V4.67186M2 3.33593H4.67439M12.6628 11.2972V14M11.3256 12.6486H14M7.21242 3.73047L6.33985 6.34322L3.72212 7.21413C2.96543 7.46588 2.96543 8.53417 3.72212 8.78592L6.33985 9.65683L7.21242 12.2696C7.46465 13.0248 8.53498 13.0248 8.78721 12.2696L9.65978 9.65683L12.2775 8.78592C13.0342 8.53417 13.0342 7.46588 12.2775 7.21413L9.65978 6.34322L8.78721 3.73047C8.53498 2.97522 7.46465 2.97522 7.21242 3.73047Z" stroke="url(#ai-spark-tab-gradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="ai-spark-tab-gradient" x1="2.69767" y1="-1.6" x2="17.8255" y2="4.47728" gradientUnits="userSpaceOnUse">
+      <stop offset="0.1" stop-color="#00B49F"/>
+      <stop offset="0.514542" stop-color="#0D4AC3"/>
+      <stop offset="1" stop-color="#5435AB"/>
+    </linearGradient>
+  </defs>
+</svg>
