@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./figma-color-variables.css";
+import "./customWidgets/customWidgets.css";
 import "./index.css";
 
 const muiTheme = createTheme({

@@ -13,11 +13,14 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^9.0.1",
     "@mui/material": "^9.0.1",
+    "prismjs": "^1.30.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-is": "^18.3.1"
+    "react-is": "^18.3.1",
+    "react-simple-code-editor": "^0.14.1"
   },
   "devDependencies": {
+    "@types/prismjs": "^1.26.6",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.5.0",

@@ -1,8 +1,4 @@
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Switch from "@mui/material/Switch";
-import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import AddIcon from "@mui/icons-material/Add";
-import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
 import CalculateOutlinedIcon from "@mui/icons-material/CalculateOutlined";
@@ -37,20 +33,47 @@ import TableChartOutlinedIcon from "@mui/icons-material/TableChartOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import ViewModuleOutlinedIcon from "@mui/icons-material/ViewModuleOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 import {
-  forwardRef,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
-  type HTMLAttributes,
   type ReactNode,
   type RefObject,
 } from "react";
+import { flushSync } from "react-dom";
 import configureHomepageIconUrl from "./assets/configure-homepage.svg";
+import { buildTopAccountsLiveDataProposal } from "./ai/assistantProposals";
+import { useAiHomepageConfigChat } from "./ai/useAiHomepageConfigChat";
+import type { CustomWidgetProposal, TeamTemplateProposal } from "./ai/types";
+import { HomepageTemplateEditor } from "./components/HomepageTemplateEditor";
+import { createTemplateDraftFromProposal } from "./homepageConfig/teamTemplate";
+import type { HomepageTemplateDraft } from "./homepageConfig/teamTemplate";
 import { AiChatBadge, AiChatPanel } from "./AiChatPanel";
+import { AiGeneratedDashboard } from "./components/AiGeneratedDashboard";
+import { DashboardWidget } from "./components/dashboardWidgets/DashboardWidgets";
+import type { DashboardWidgetId } from "./components/dashboardWidgets/catalog";
+import { HomepageEmptyState } from "./components/HomepageEmptyState";
+import { OnboardingScreen, type OnboardingTemplateId } from "./components/OnboardingScreen";
+import { getCurrentDashboardWidgetIds } from "./homepageConfig/homepageCleanup";
+import type { HomepageCleanupPlan } from "./homepageConfig/homepageCleanup";
 import { FloatingButton } from "./FloatingButton";
+import { useHomepageConfig } from "./homepageConfig/useHomepageConfig";
+import { ConfigureCustomWidgetPanel } from "./components/customWidgets/ConfigureCustomWidgetPanel";
+import { createNewWidgetDraft, CustomWidgetEditor, type EditorStep } from "./components/customWidgets/CustomWidgetEditor";
+import { getCustomWidgetEditorCaptureConfig } from "./figmaCapture/customWidgetEditorCapture";
+import { HomepageCustomWidgets } from "./components/customWidgets/HomepageCustomWidgets";
+import { WidgetDrawerShell } from "./components/customWidgets/WidgetDrawerShell";
+import { WidgetSizePreview } from "./components/customWidgets/WidgetSizePreview";
+import { HomepageActionsMenu } from "./components/customWidgets/HomepageActionsMenu";
+import { ManageCustomWidgetsPage } from "./components/customWidgets/ManageCustomWidgetsPage";
+import { ManageTemplatesHubPage } from "./components/customWidgets/ManageTemplatesHubPage";
+import { createCustomWidgetRefId } from "./customWidgets/types";
+import type { CustomWidget, CustomWidgetDraft, CustomWidgetSize } from "./customWidgets/types";
+import { useCustomWidgets } from "./customWidgets/useCustomWidgets";
 
 const menuItems = [
   { label: "Dashboard", icon: <DashboardOutlinedIcon /> },
@@ -64,39 +87,6 @@ const menuItems = [
   { label: "File Upload", icon: <CloudUploadOutlinedIcon /> },
   { label: "Setups", icon: <SettingsApplicationsOutlinedIcon /> },
 ];
-
-const reports = [
-  ["1000001", "Revenue Insights", "2026/02/19  22:13"],
-  ["1000002", "RCRF RollForward", "2026/02/19  22:13"],
-  ["1000003", "Revenue Trends Export", "2026/02/19  22:13"],
-  ["1000004", "Billing Waterfall", "2026/02/19  22:13"],
-  ["1000005", "Cost Insight", "2026/02/19  22:13"],
-];
-
-const taskRows = [
-  ["SSP Exceptions", "32"],
-  ["Auto POBs", "18"],
-  ["Orphan Transactions", "10"],
-  ["Inbound Transactions Exceptions", "5"],
-];
-
-const scheduleJobs = [
-  ["1000001", "Data Sync", "2026/02/19  22:13", "completed"],
-  ["1000002", "Monthly Revenue Calcul...", "2026/02/19  22:13", "completed"],
-  ["1000003", "User Engagement Report", "2026/02/19  22:13", "completed"],
-  ["1000004", "Immediate POB Release", "2026/02/19  22:13", "error"],
-  ["1000005", "Process Usage Data", "2026/02/19  22:13", "warning"],
-] as const;
-
-const sspBatches = [
-  ["vCPU Edition", "FY25 vCPU Edition", "10000001"],
-  ["Product Family", "FY23 Product Family", "10000002"],
-  ["Perpetual License", "FY21 Perpetual License", "10000003"],
-  ["AppDynamics SSP...", "FY25 vCPU Edition", "10000004"],
-  ["vCPU Edition", "FY25 vCPU Edition", "10000005"],
-  ["Product Family", "FY23 Product Family", "10000006"],
-  ["Perpetual License", "FY21 Perpetual License", "10000007"],
-] as const;
 
 const notificationAnnouncements = [
   {
@@ -127,8 +117,17 @@ const OCCAM_TITLE_L_SIZE = 17;
 const STICKY_TITLE_SCALE = OCCAM_TITLE_L_SIZE / OCCAM_HEADLINE_L_SIZE;
 
 type ActionsLayout = "stacked" | "horizontal";
-type BannerPlacement = "default" | "pin-on-scroll" | "chip-on-scroll";
 type WidgetDrawerStep = "closed" | "select" | "configure";
+type WidgetDrawerConfigureKind = "revenue-progress" | "custom-widget";
+type WidgetDrawerConfigureEntry = "select" | "direct";
+type HomepageView =
+  | "home"
+  | "manage-hub"
+  | "manage-custom-widgets"
+  | "create-widget"
+  | "edit-widget"
+  | "edit-template";
+type ManageWidgetsTab = "published" | "drafts" | "history";
 
 const WIDGET_TYPES = [
   {
@@ -191,7 +190,6 @@ type StickyProgressStyle = CSSProperties & {
   "--welcome-y": string;
   "--welcome-scale": number;
   "--notification-banner-pinned-height": string;
-  "--chip-return-center-phase": number;
 };
 
 function clampStickyProgress(scrollTop: number) {
@@ -200,42 +198,6 @@ function clampStickyProgress(scrollTop: number) {
 
 function easeInOut(value: number) {
   return value * value * (3 - 2 * value);
-}
-
-function easeInOutCubic(value: number) {
-  return value < 0.5 ? 4 * value * value * value : 1 - (-2 * value + 2) ** 3 / 2;
-}
-
-function smoothScrollTo(element: HTMLElement, targetTop: number, duration: number) {
-  return new Promise<void>((resolve) => {
-    const startTop = element.scrollTop;
-    const distance = targetTop - startTop;
-
-    if (Math.abs(distance) < 1) {
-      element.scrollTop = targetTop;
-      resolve();
-      return;
-    }
-
-    const startTime = performance.now();
-    let frame = 0;
-
-    const step = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(1, elapsed / duration);
-      element.scrollTop = startTop + distance * easeInOutCubic(progress);
-
-      if (progress < 1) {
-        frame = window.requestAnimationFrame(step);
-        return;
-      }
-
-      element.scrollTop = targetTop;
-      resolve();
-    };
-
-    frame = window.requestAnimationFrame(step);
-  });
 }
 
 function runAfterScrollSettles(scrollNode: HTMLElement, callback: () => void, maxWait = 1500) {
@@ -302,22 +264,23 @@ function isElementVisibleInScrollContainer(element: HTMLElement, container: HTML
   return visibleHeight >= elementRect.height * 0.5;
 }
 
-function useStickyProgress() {
+function useStickyProgress(enabled: boolean) {
   const scrollRef = useRef<HTMLElement | null>(null);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const scrollNode = scrollRef.current;
-
-    if (!scrollNode) {
+    if (!enabled) {
+      setProgress(0);
       return undefined;
     }
 
     let frame = 0;
+    let scrollNode: HTMLElement | null = null;
+    let cancelled = false;
 
     const getScrollTop = () =>
       Math.max(
-        scrollNode.scrollTop,
+        scrollNode?.scrollTop ?? 0,
         window.scrollY,
         document.documentElement.scrollTop,
         document.body.scrollTop,
@@ -332,28 +295,41 @@ function useStickyProgress() {
     };
 
     const scheduleUpdate = () => {
-      if (frame) {
+      if (frame || cancelled) {
         return;
       }
 
       frame = window.requestAnimationFrame(updateProgress);
     };
 
-    updateProgress();
-    scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
+    const attachListeners = () => {
+      scrollNode = scrollRef.current;
+
+      if (!scrollNode) {
+        frame = window.requestAnimationFrame(attachListeners);
+        return;
+      }
+
+      updateProgress();
+      scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
+      window.addEventListener("scroll", scheduleUpdate, { passive: true });
+      window.addEventListener("resize", scheduleUpdate);
+    };
+
+    attachListeners();
 
     return () => {
+      cancelled = true;
+
       if (frame) {
         window.cancelAnimationFrame(frame);
       }
 
-      scrollNode.removeEventListener("scroll", scheduleUpdate);
+      scrollNode?.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);
     };
-  }, []);
+  }, [enabled]);
 
   return { progress, scrollRef };
 }
@@ -369,37 +345,6 @@ function getActionsLayout(): ActionsLayout {
 
   const params = new URLSearchParams(window.location.search);
   return params.get("variant") === "horizontal-buttons" ? "horizontal" : "stacked";
-}
-
-function getBannerPlacement(): BannerPlacement {
-  if (typeof window === "undefined") {
-    return "default";
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  const banner = params.get("banner");
-
-  if (banner === "pin-on-scroll") {
-    return "pin-on-scroll";
-  }
-
-  if (banner === "chip-on-scroll") {
-    return "chip-on-scroll";
-  }
-
-  return "default";
-}
-
-function syncBannerPlacementUrl(bannerPlacement: BannerPlacement) {
-  const url = new URL(window.location.href);
-
-  if (bannerPlacement === "default") {
-    url.searchParams.delete("banner");
-  } else {
-    url.searchParams.set("banner", bannerPlacement);
-  }
-
-  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function getInitialActionsGeometry(actionsLayout: ActionsLayout = getActionsLayout()) {
@@ -447,6 +392,7 @@ function useFloatingActionsGeometry(
   aiChatOpen: boolean,
   notificationBannerVisible: boolean,
   bannerPinned: boolean,
+  homepageActive: boolean,
 ) {
   const [geometry, setGeometry] = useState(() => getInitialActionsGeometry(actionsLayout));
 
@@ -505,6 +451,7 @@ function useFloatingActionsGeometry(
     actionsLayout,
     aiChatOpen,
     bannerPinned,
+    homepageActive,
     notificationBannerVisible,
     pinnedBannerHeight,
     progress,
@@ -517,6 +464,7 @@ function useSearchMorphGeometry(
   progress: number,
   bannerAffectsHero: boolean,
   pinnedBannerHeight: number,
+  homepageActive: boolean,
 ) {
   const [geometry, setGeometry] = useState({
     "--search-morph-left": "24px",
@@ -598,70 +546,96 @@ function useSearchMorphGeometry(
       resizeObserver?.disconnect();
       window.removeEventListener("resize", updateGeometry);
     };
-  }, [bannerAffectsHero, pinnedBannerHeight, progress]);
+  }, [bannerAffectsHero, homepageActive, pinnedBannerHeight, progress]);
 
   return geometry;
 }
 
-function useWelcomeHeroMorphY(bannerAffectsHero: boolean) {
+function useWelcomeHeroMorphY(
+  bannerAffectsHero: boolean,
+  homepageActive: boolean,
+  scrollRef: RefObject<HTMLElement | null>,
+) {
   const [welcomeTitleMorphY, setWelcomeTitleMorphY] = useState(WELCOME_TITLE_MORPH_Y);
 
   useLayoutEffect(() => {
-    const getWelcomeHeadingOffset = () => {
-      const main = document.querySelector<HTMLElement>(".homepage-main");
-      const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
+    if (!homepageActive) {
+      return undefined;
+    }
 
-      if (!main || !welcomeSearch) {
+    const getWelcomeHeadingOffset = () => {
+      const scrollNode = scrollRef.current;
+      const stickyHeader = document.querySelector<HTMLElement>(".homepage-sticky-header");
+      const welcomeHeading = document.querySelector<HTMLElement>(".welcome-search h2");
+
+      if (!stickyHeader || !welcomeHeading) {
         return WELCOME_TITLE_MORPH_Y;
       }
 
-      let offset = 0;
-      let node: HTMLElement | null = welcomeSearch;
-
-      while (node && node !== main) {
-        offset += node.offsetTop;
-        node = node.offsetParent as HTMLElement | null;
+      if (scrollNode && scrollNode.scrollTop > 1) {
+        return null;
       }
 
-      return Math.max(WELCOME_TITLE_MORPH_Y, offset - STICKY_HEADER_TITLE_TOP);
+      const headingRect = welcomeHeading.getBoundingClientRect();
+      const headerRect = stickyHeader.getBoundingClientRect();
+
+      return Math.max(
+        WELCOME_TITLE_MORPH_Y,
+        headingRect.top - headerRect.top - STICKY_HEADER_TITLE_TOP,
+      );
     };
 
     const updateMorphY = () => {
-      setWelcomeTitleMorphY(getWelcomeHeadingOffset());
+      const nextOffset = getWelcomeHeadingOffset();
+
+      if (nextOffset == null) {
+        return;
+      }
+
+      setWelcomeTitleMorphY((current) =>
+        Math.abs(current - nextOffset) > 0.5 ? nextOffset : current,
+      );
     };
 
-    updateMorphY();
+    const scheduleUpdate = () => {
+      updateMorphY();
+      window.requestAnimationFrame(updateMorphY);
+    };
 
+    scheduleUpdate();
+
+    const scrollNode = scrollRef.current;
     const bannerRegion = document.querySelector<HTMLElement>(".notification-banner-region");
+    const pinnedBanner = document.querySelector<HTMLElement>(".notification-banner-fixed");
+    const stickyHeader = document.querySelector<HTMLElement>(".homepage-sticky-header");
     const welcomeSearch = document.querySelector<HTMLElement>(".welcome-search");
     const resizeObserver =
       typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(updateMorphY)
+        ? new ResizeObserver(scheduleUpdate)
         : null;
 
-    if (bannerRegion) {
-      resizeObserver?.observe(bannerRegion);
-    }
+    resizeObserver?.observe(bannerRegion ?? document.documentElement);
+    resizeObserver?.observe(pinnedBanner ?? document.documentElement);
+    resizeObserver?.observe(stickyHeader ?? document.documentElement);
+    resizeObserver?.observe(welcomeSearch ?? document.documentElement);
 
-    if (welcomeSearch) {
-      resizeObserver?.observe(welcomeSearch);
-    }
-
-    window.addEventListener("resize", updateMorphY);
+    scrollNode?.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
 
     return () => {
       resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateMorphY);
+      scrollNode?.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
     };
-  }, [bannerAffectsHero]);
+  }, [bannerAffectsHero, homepageActive, scrollRef]);
 
   return welcomeTitleMorphY;
 }
 
 function useBannerPinMotion(
-  bannerPlacement: BannerPlacement,
   notificationBannerVisible: boolean,
   scrollRef: RefObject<HTMLElement | null>,
+  homepageActive: boolean,
 ) {
   const bannerAnchorRef = useRef<HTMLDivElement | null>(null);
   const bannerSlotRef = useRef<HTMLDivElement | null>(null);
@@ -670,23 +644,19 @@ function useBannerPinMotion(
   const [pinnedBannerHeight, setPinnedBannerHeight] = useState(NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK);
 
   useEffect(() => {
-    if (bannerPlacement !== "pin-on-scroll" || !notificationBannerVisible) {
+    if (!homepageActive || !notificationBannerVisible) {
       setBannerPinned(false);
       return undefined;
     }
 
-    const scrollNode = scrollRef.current;
-    const slot = bannerSlotRef.current;
-
-    if (!scrollNode || !slot) {
-      return undefined;
-    }
-
     let frame = 0;
+    let cancelled = false;
+    let scrollNode: HTMLElement | null = null;
+    let slot: HTMLDivElement | null = null;
 
     const getScrollTop = () =>
       Math.max(
-        scrollNode.scrollTop,
+        scrollNode?.scrollTop ?? 0,
         window.scrollY,
         document.documentElement.scrollTop,
         document.body.scrollTop,
@@ -694,37 +664,56 @@ function useBannerPinMotion(
 
     const updatePinned = () => {
       frame = 0;
+
+      if (!slot) {
+        return;
+      }
+
       const scrollTop = getScrollTop();
       const slotTop = slot.getBoundingClientRect().top;
       setBannerPinned(scrollTop > 0 && slotTop <= 0);
     };
 
     const scheduleUpdate = () => {
-      if (frame) {
+      if (frame || cancelled) {
         return;
       }
 
       frame = window.requestAnimationFrame(updatePinned);
     };
 
-    updatePinned();
-    scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
+    const attachListeners = () => {
+      scrollNode = scrollRef.current;
+      slot = bannerSlotRef.current;
+
+      if (!scrollNode || !slot) {
+        frame = window.requestAnimationFrame(attachListeners);
+        return;
+      }
+
+      updatePinned();
+      scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
+      window.addEventListener("scroll", scheduleUpdate, { passive: true });
+      window.addEventListener("resize", scheduleUpdate);
+    };
+
+    attachListeners();
 
     return () => {
+      cancelled = true;
+
       if (frame) {
         window.cancelAnimationFrame(frame);
       }
 
-      scrollNode.removeEventListener("scroll", scheduleUpdate);
+      scrollNode?.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("scroll", scheduleUpdate);
       window.removeEventListener("resize", scheduleUpdate);
     };
-  }, [bannerPlacement, notificationBannerVisible, scrollRef]);
+  }, [homepageActive, notificationBannerVisible, scrollRef]);
 
   useLayoutEffect(() => {
-    if (bannerPlacement !== "pin-on-scroll" || !notificationBannerVisible || !bannerPinned) {
+    if (!notificationBannerVisible || !bannerPinned) {
       setPinnedBannerHeight(NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK);
       return undefined;
     }
@@ -751,7 +740,7 @@ function useBannerPinMotion(
       resizeObserver?.disconnect();
       window.removeEventListener("resize", updateHeight);
     };
-  }, [bannerPinned, bannerPlacement, notificationBannerVisible]);
+  }, [bannerPinned, notificationBannerVisible]);
 
   return {
     bannerAnchorRef,
@@ -760,67 +749,6 @@ function useBannerPinMotion(
     bannerSlotRef,
     pinnedBannerHeight,
   };
-}
-
-function useBannerChipVisibility(
-  bannerPlacement: BannerPlacement,
-  notificationBannerVisible: boolean,
-  scrollRef: RefObject<HTMLElement | null>,
-  bannerSlotRef: RefObject<HTMLDivElement | null>,
-  stickyControlsActive: boolean,
-) {
-  const [bannerScrolledAway, setBannerScrolledAway] = useState(false);
-
-  useEffect(() => {
-    if (bannerPlacement !== "chip-on-scroll" || !notificationBannerVisible) {
-      setBannerScrolledAway(false);
-      return undefined;
-    }
-
-    const scrollNode = scrollRef.current;
-    const slot = bannerSlotRef.current;
-
-    if (!scrollNode || !slot) {
-      return undefined;
-    }
-
-    let frame = 0;
-
-    const updateVisibility = () => {
-      frame = 0;
-      setBannerScrolledAway(!isElementVisibleInScrollContainer(slot, scrollNode));
-    };
-
-    const scheduleUpdate = () => {
-      if (frame) {
-        return;
-      }
-
-      frame = window.requestAnimationFrame(updateVisibility);
-    };
-
-    updateVisibility();
-    scrollNode.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    window.addEventListener("resize", scheduleUpdate);
-
-    return () => {
-      if (frame) {
-        window.cancelAnimationFrame(frame);
-      }
-
-      scrollNode.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("scroll", scheduleUpdate);
-      window.removeEventListener("resize", scheduleUpdate);
-    };
-  }, [bannerPlacement, bannerSlotRef, notificationBannerVisible, scrollRef]);
-
-  return (
-    bannerPlacement === "chip-on-scroll" &&
-    notificationBannerVisible &&
-    bannerScrolledAway &&
-    stickyControlsActive
-  );
 }
 
 function IconButton({
@@ -996,35 +924,15 @@ function ConfigurePageIcon() {
   return <img alt="" aria-hidden="true" className="configure-page-icon" src={configureHomepageIconUrl} />;
 }
 
-function StickyHeader({
-  active,
-  announcementCount,
-  onAnnouncementChipClick,
-  showAnnouncementChip,
-}: {
-  active: boolean;
-  announcementCount: number;
-  onAnnouncementChipClick?: () => void;
-  showAnnouncementChip?: boolean;
-}) {
-  const announcementLabel =
-    announcementCount === 1 ? "1 announcement" : `${announcementCount} announcements`;
+function StickyHeader({ active, visible }: { active: boolean; visible: boolean }) {
+  if (!visible) {
+    return null;
+  }
 
   return (
     <header className="homepage-sticky-header" data-node-id="1:148707" aria-hidden={!active}>
       <div className="sticky-header-leading">
         <h1>Welcome to Zuora, Rachel Carter</h1>
-        {showAnnouncementChip ? (
-          <button
-            aria-label={`View ${announcementLabel}`}
-            className="announcement-chip"
-            data-node-id="130:18299"
-            onClick={onAnnouncementChipClick}
-            type="button"
-          >
-            {announcementLabel}
-          </button>
-        ) : null}
       </div>
       <div className="sticky-actions">
         <SearchField className="sticky-search-placeholder" compact hidden />
@@ -1038,18 +946,43 @@ function MorphingSearchField() {
   return <SearchField className="morphing-search-control" />;
 }
 
-function MorphingFloatingActions({ onOpenAddWidgetPanel }: { onOpenAddWidgetPanel: () => void }) {
+function MorphingFloatingActions({
+  configureActionsRef,
+  homepageMenuOpen,
+  onCloseHomepageMenu,
+  onOpenAddWidgetPanel,
+  onOpenManageHub,
+  onResetHomepage,
+  onToggleHomepageMenu,
+}: {
+  configureActionsRef: RefObject<HTMLDivElement | null>;
+  homepageMenuOpen: boolean;
+  onCloseHomepageMenu: () => void;
+  onOpenAddWidgetPanel: () => void;
+  onOpenManageHub: () => void;
+  onResetHomepage: () => void;
+  onToggleHomepageMenu: () => void;
+}) {
   return (
-    <div className="morphing-floating-actions" data-node-id="1:139205">
+    <div className="morphing-floating-actions" data-node-id="1:139205" ref={configureActionsRef}>
       <FloatingButton
         aria-label="Configure homepage"
         className="morphing-floating-button morphing-floating-button-configure"
         icon={<ConfigurePageIcon />}
+        onClick={onToggleHomepageMenu}
         shape="circular"
         size="small"
         theme="light"
         variant="secondary"
       />
+      {homepageMenuOpen ? (
+        <HomepageActionsMenu
+          anchorRef={configureActionsRef}
+          onClose={onCloseHomepageMenu}
+          onManageTemplates={onOpenManageHub}
+          onResetHomepage={onResetHomepage}
+        />
+      ) : null}
       <FloatingButton
         aria-label="Add widget"
         className="morphing-floating-button morphing-floating-button-create"
@@ -1063,43 +996,6 @@ function MorphingFloatingActions({ onOpenAddWidgetPanel }: { onOpenAddWidgetPane
   );
 }
 
-function BannerPlacementSelect({
-  value,
-  onChange,
-}: {
-  value: BannerPlacement;
-  onChange: (value: BannerPlacement) => void;
-}) {
-  return (
-    <label className="prototype-control">
-      <span>Banner</span>
-      <select
-        aria-label="Notification banner placement version"
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value as BannerPlacement)}
-      >
-        <option value="default">Option 1 — Scrolls with content</option>
-        <option value="pin-on-scroll">Option 2 — Pin above header</option>
-        <option value="chip-on-scroll">Option 3 — Hide in header chip</option>
-      </select>
-    </label>
-  );
-}
-
-function PrototypeControls({
-  bannerPlacement,
-  onBannerPlacementChange,
-}: {
-  bannerPlacement: BannerPlacement;
-  onBannerPlacementChange: (value: BannerPlacement) => void;
-}) {
-  return (
-    <div className="prototype-controls">
-      <BannerPlacementSelect value={bannerPlacement} onChange={onBannerPlacementChange} />
-    </div>
-  );
-}
-
 function WelcomeSearch() {
   return (
     <section className="welcome-search" data-node-id="1:57109">
@@ -1109,629 +1005,6 @@ function WelcomeSearch() {
   );
 }
 
-function OccamSwitch({
-  defaultChecked = false,
-  label,
-}: {
-  defaultChecked?: boolean;
-  label: string;
-}) {
-  return (
-    <FormControlLabel
-      className="occam-switch"
-      control={<Switch defaultChecked={defaultChecked} size="small" />}
-      data-name="Switch"
-      label={label}
-    />
-  );
-}
-
-function ActionButton({
-  children,
-  disabled = false,
-  icon,
-}: {
-  children: ReactNode;
-  disabled?: boolean;
-  icon?: ReactNode;
-}) {
-  return (
-    <button className="action-button" disabled={disabled} type="button">
-      {icon}
-      <span>{children}</span>
-    </button>
-  );
-}
-
-type WidgetCardProps = HTMLAttributes<HTMLElement> & {
-  children: ReactNode;
-  className?: string;
-  contentClassName?: string;
-  contentGap?: 8 | 16;
-};
-
-const WidgetCard = forwardRef<HTMLElement, WidgetCardProps>(function WidgetCard(
-  { children, className = "", contentClassName = "", contentGap = 16, ...rest },
-  ref,
-) {
-  return (
-    <section className={`widget-card ${className}`.trim()} ref={ref} {...rest}>
-      <div className={`widget-card-inner widget-card-inner-gap-${contentGap} ${contentClassName}`.trim()}>
-        {children}
-      </div>
-    </section>
-  );
-});
-
-function WidgetIconButton({ label = "More actions" }: { label?: string }) {
-  return (
-    <button className="widget-icon-button" type="button" aria-label={label}>
-      <MoreHorizIcon />
-    </button>
-  );
-}
-
-function HeaderActions({
-  children,
-  gap = 8,
-  showMore = true,
-}: {
-  children?: ReactNode;
-  gap?: 8 | 12;
-  showMore?: boolean;
-}) {
-  return (
-    <div className={`header-actions${gap === 12 ? " header-actions-wide" : ""}`.trim()}>
-      {children}
-      {showMore ? <WidgetIconButton /> : null}
-    </div>
-  );
-}
-
-function CardHeader({
-  title,
-  refreshed = true,
-  action,
-  showMoreMenu = false,
-}: {
-  title: string;
-  refreshed?: boolean;
-  action?: ReactNode;
-  showMoreMenu?: boolean;
-}) {
-  return (
-    <div className="card-header">
-      <div>
-        <h3>{title}</h3>
-        {refreshed ? <p>Last refreshed at 01/01/2026, 6.31 PM PST</p> : null}
-      </div>
-      {action ?? (showMoreMenu ? <HeaderActions /> : null)}
-    </div>
-  );
-}
-
-function TextButton({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
-  return (
-    <button className="text-button" type="button">
-      {icon}
-      <span>{children}</span>
-    </button>
-  );
-}
-
-function StatusChip({
-  showInfo = false,
-  variant,
-}: {
-  showInfo?: boolean;
-  variant: "completed" | "error" | "warning";
-}) {
-  return (
-    <span className={`status-chip status-chip-${variant}`}>
-      {variant}
-      {showInfo ? <InfoOutlinedIcon /> : null}
-    </span>
-  );
-}
-
-function FilterChip({
-  label,
-  value,
-  active = false,
-  removable = false,
-}: {
-  label: string;
-  value: string;
-  active?: boolean;
-  removable?: boolean;
-}) {
-  return (
-    <button className={active ? "filter-chip filter-chip-active" : "filter-chip"} type="button">
-      <strong>{label}</strong>
-      <span>: {value}</span>
-      {removable ? <CloseIcon /> : <ExpandMoreIcon />}
-    </button>
-  );
-}
-
-function RevenueOverview() {
-  return (
-    <WidgetCard>
-      <CardHeader
-        action={
-          <HeaderActions>
-            <div className="split-button">
-              <ActionButton>Refresh</ActionButton>
-              <button type="button" aria-label="Refresh menu">
-                <ExpandMoreIcon />
-              </button>
-            </div>
-          </HeaderActions>
-        }
-        title="Revenue Overview"
-      />
-      <div className="filter-row">
-        <FilterChip label="Duration" value="Last Month" />
-        <FilterChip active label="Location" removable value="All" />
-        <TextButton icon={<TuneOutlinedIcon />}>Add filter</TextButton>
-      </div>
-      <div className="donut-area">
-        <div className="donut-chart" role="img" aria-label="Revenue by region donut chart">
-          <div className="donut-center">
-            <strong>$12,4K</strong>
-            <span>Total</span>
-          </div>
-          <div className="donut-trend">
-            <ArrowDropUpIcon /> 10%
-          </div>
-        </div>
-        <ul className="legend-list">
-          <li className="legend-item-active">
-            <span className="legend-dot legend-us" /> US
-          </li>
-          <li>
-            <span className="legend-dot legend-emea" /> EMEA
-          </li>
-          <li>
-            <span className="legend-dot legend-apac" /> APAC
-          </li>
-          <li>
-            <span className="legend-dot legend-latam" /> LATAM
-          </li>
-          <li>
-            <span className="legend-dot legend-other" /> Others
-          </li>
-        </ul>
-      </div>
-    </WidgetCard>
-  );
-}
-
-function RevenueTasks() {
-  return (
-    <WidgetCard contentGap={8}>
-      <CardHeader
-        action={
-          <HeaderActions gap={12}>
-            <ActionButton>Refresh</ActionButton>
-          </HeaderActions>
-        }
-        title="Revenue Tasks"
-      />
-      <div className="task-toolbar">
-        <div className="tabs">
-          <button className="tab tab-active" type="button">
-            Exceptions
-          </button>
-          <button className="tab" type="button">
-            Actions
-          </button>
-        </div>
-        <OccamSwitch defaultChecked label="Pending Data Only" />
-      </div>
-      <div className="task-list">
-        {taskRows.map(([label, value]) => (
-          <div className="task-list-item" key={label}>
-            <span className="warning-dot" />
-            <span>{label}</span>
-            <InfoOutlinedIcon />
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </div>
-    </WidgetCard>
-  );
-}
-
-function RunReport() {
-  return (
-    <WidgetCard className="report-card">
-      <CardHeader refreshed={false} showMoreMenu title="Zuora Revenue Report" />
-      <div className="form-row">
-        <label>
-          <strong>Search Report</strong>
-          <span className="field-control">
-            <SearchIcon />
-            <input placeholder="Search report" />
-          </span>
-        </label>
-        <label>
-          <strong>Select Layout</strong>
-          <span className="field-control select-control">
-            <input placeholder="Select layout" readOnly />
-            <ExpandMoreIcon />
-          </span>
-        </label>
-        <ActionButton disabled>Submit</ActionButton>
-      </div>
-      <div className="table-heading">
-        <h4>Recent Downloads</h4>
-        <button type="button" aria-label="Refresh recent downloads">
-          <RefreshOutlinedIcon />
-        </button>
-      </div>
-      <div className="widget-table-wrap">
-        <table className="downloads-table">
-          <thead>
-            <tr>
-              <th>Report ID</th>
-              <th>Report Name</th>
-              <th>Completion Time</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map(([id, name, time]) => (
-              <tr key={id}>
-                <td>{id}</td>
-                <td>{name}</td>
-                <td>{time}</td>
-                <td>
-                  <FileDownloadOutlinedIcon />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <button className="text-link" type="button">
-        View All Downloads
-      </button>
-    </WidgetCard>
-  );
-}
-
-function RunProgram() {
-  return (
-    <WidgetCard className="program-card">
-      <CardHeader refreshed={false} showMoreMenu title="Zuora Revenue Program" />
-      <div className="form-row program-form-row">
-        <label>
-          <strong>Search Program</strong>
-          <span className="field-control">
-            <SearchIcon />
-            <input placeholder="Search program" />
-          </span>
-        </label>
-        <span className="program-checkbox">
-          <CheckBoxOutlineBlankOutlinedIcon />
-          Job Group
-        </span>
-        <ActionButton disabled>Run Program</ActionButton>
-      </div>
-      <div className="table-heading">
-        <h4>Recent Schedule Jobs</h4>
-        <button type="button" aria-label="Refresh recent schedule jobs">
-          <RefreshOutlinedIcon />
-        </button>
-      </div>
-      <div className="widget-table-wrap">
-        <table className="widget-table program-table">
-          <thead>
-            <tr>
-              <th>Job ID</th>
-              <th>Job Name</th>
-              <th>Completion Time</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scheduleJobs.map(([id, name, time, status]) => (
-              <tr key={id}>
-                <td>{id}</td>
-                <td>{name}</td>
-                <td>{time}</td>
-                <td>
-                  <StatusChip
-                    showInfo={status === "error" || status === "warning"}
-                    variant={status}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <button className="text-link" type="button">
-        View All Schedule Jobs
-      </button>
-    </WidgetCard>
-  );
-}
-
-function FileUpload() {
-  return (
-    <WidgetCard className="upload-card">
-      <CardHeader refreshed={false} showMoreMenu title="File Upload" />
-      <div className="upload-form-row">
-        <div className="upload-form-fields">
-          <label className="upload-form-field">
-            <strong>Select Type</strong>
-            <span className="upload-select">Select type <ExpandMoreIcon /></span>
-          </label>
-          <label className="upload-form-field">
-            <strong>Select Template</strong>
-            <span className="upload-select upload-select-disabled">
-              Select template <ExpandMoreIcon />
-            </span>
-          </label>
-        </div>
-        <ActionButton disabled>Upload file</ActionButton>
-      </div>
-      <div className="upload-recent-section">
-        <div className="table-heading">
-          <h4>Recent Uploads</h4>
-        </div>
-        <div className="upload-empty-state">
-          <p>Select type and template to upload files and view recent uploads</p>
-        </div>
-      </div>
-    </WidgetCard>
-  );
-}
-
-function ActiveBatches() {
-  return (
-    <WidgetCard className="batches-card">
-      <CardHeader
-        action={
-          <HeaderActions>
-            <ActionButton>Download</ActionButton>
-          </HeaderActions>
-        }
-        title="Active SSP Batches"
-      />
-      <div className="widget-table-wrap">
-        <div className="widget-table-toolbar">
-          <button type="button" aria-label="Refresh batches">
-            <RefreshOutlinedIcon />
-          </button>
-        </div>
-        <table className="widget-table batches-table">
-          <thead>
-            <tr>
-              <th>Template</th>
-              <th>Batch Name</th>
-              <th>Batch ID</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sspBatches.map(([template, batchName, batchId]) => (
-              <tr key={batchId}>
-                <td>{template}</td>
-                <td>
-                  <a className="table-link" href="#">
-                    {batchName}
-                  </a>
-                </td>
-                <td>{batchId}</td>
-                <td>
-                  <AccountTreeOutlinedIcon />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <button className="text-link" type="button">
-        View All Batches
-      </button>
-    </WidgetCard>
-  );
-}
-
-function RCSearch() {
-  return (
-    <WidgetCard className="rc-search-card">
-      <CardHeader refreshed={false} showMoreMenu title="Revenue Contract Search" />
-      <div className="rc-search-body">
-        <div className="rc-search-fields">
-          <label>
-            <strong>Quick Search</strong>
-            <span className="field-control">
-              <input placeholder="Select saved search" readOnly />
-              <ExpandMoreIcon />
-            </span>
-          </label>
-          <div className="rc-search-divider" />
-          <div>
-            <strong>Filters</strong>
-            <div className="rc-filters-panel">
-              <div className="rc-filters-toolbar">
-                <span className="rc-operator-select">
-                  And
-                  <ExpandMoreIcon />
-                </span>
-                <TextButton icon={<AddIcon />}>Add Rule</TextButton>
-              </div>
-              <div className="rc-rule-row">
-                <div className="rc-rule-fields">
-                  <span className="rc-rule-field">Select source <ExpandMoreIcon /></span>
-                  <span className="rc-rule-field rc-rule-field-filled">Equals to <ExpandMoreIcon /></span>
-                  <span className="rc-rule-field">Select value <ExpandMoreIcon /></span>
-                </div>
-                <button className="rc-delete-button" type="button" aria-label="Delete rule">
-                  <DeleteOutlinedIcon />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="rc-search-footer">
-          <ActionButton disabled>Search</ActionButton>
-        </div>
-      </div>
-    </WidgetCard>
-  );
-}
-
-const processSteps = [
-  ["5", "Run Event programs", "Due by Day 2", true],
-  ["6", "Review Unreleased POB", "Due by Day 3", true],
-  ["7", "Review revenue report", "Due Day 4", false],
-] as const;
-
-function CloseProcessStatus({
-  widgetRef,
-}: {
-  widgetRef: RefObject<HTMLElement | null>;
-}) {
-  useEffect(() => {
-    const widget = widgetRef.current;
-
-    if (!widget) {
-      return undefined;
-    }
-
-    const handleEnterAnimationEnd = (event: AnimationEvent) => {
-      if (event.target !== widget || event.animationName !== "widget-card-added-in") {
-        return;
-      }
-
-      widget.classList.add("widget-card-settled");
-      widget.removeEventListener("animationend", handleEnterAnimationEnd);
-    };
-
-    widget.addEventListener("animationend", handleEnterAnimationEnd);
-
-    return () => {
-      widget.removeEventListener("animationend", handleEnterAnimationEnd);
-    };
-  }, [widgetRef]);
-
-  return (
-    <WidgetCard
-      className="close-process-card widget-card-added"
-      data-node-id="111:17159"
-      ref={widgetRef}
-      tabIndex={-1}
-    >
-      <CardHeader
-        action={
-          <HeaderActions>
-            <ActionButton>Refresh</ActionButton>
-          </HeaderActions>
-        }
-        title="Close Process Status"
-      />
-      <div className="close-process-body">
-        <div className="close-process-summary">
-          <div className="close-process-ring" role="img" aria-label="Close process 50 percent complete">
-            <strong>50%</strong>
-          </div>
-          <span>Completed 4/8 tasks</span>
-          <dl className="process-meta-list">
-            <div>
-              <dt>Current Period</dt>
-              <dd>April 2026</dd>
-            </div>
-            <div>
-              <dt>
-                Current Close day <InfoOutlinedIcon />
-              </dt>
-              <dd>Day 2</dd>
-            </div>
-          </dl>
-        </div>
-
-        <div className="close-process-details">
-          <div>
-            <span className="process-label">Current Task</span>
-            <div className="current-task-line">
-              <strong>Upload Events</strong>
-              <WarningAmberRoundedIcon />
-            </div>
-          </div>
-
-          <div className="process-next-tasks">
-            <span className="process-label">Next 3 Tasks</span>
-            <ol>
-              {processSteps.map(([number, title, dueDate, warning]) => (
-                <li className="process-step" key={number}>
-                  <span className="process-step-index">{number}</span>
-                  <div>
-                    <strong>{title}</strong>
-                    <p>
-                      {dueDate}
-                      {warning && <WarningAmberRoundedIcon />}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <button className="text-link process-checklist-link" type="button">
-            Go to checklist
-          </button>
-        </div>
-      </div>
-    </WidgetCard>
-  );
-}
-
-function WidgetDrawerShell({
-  ariaLabel,
-  children,
-  dataNodeId,
-  footer,
-  header,
-  onClose,
-}: {
-  ariaLabel: string;
-  children: ReactNode;
-  dataNodeId: string;
-  footer?: ReactNode;
-  header: ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <aside
-      aria-label={ariaLabel}
-      aria-modal="true"
-      className="widget-drawer"
-      data-node-id={dataNodeId}
-      role="dialog"
-    >
-      <div className="widget-drawer-panel">
-        <header className="widget-drawer-header">
-          <div className="widget-drawer-header-main">{header}</div>
-          <button
-            aria-label="Close add widget panel"
-            className="widget-drawer-close"
-            onClick={onClose}
-            type="button"
-          >
-            <CloseIcon />
-          </button>
-        </header>
-        <div className="widget-drawer-content">{children}</div>
-        {footer && <footer className="widget-drawer-footer">{footer}</footer>}
-      </div>
-    </aside>
-  );
-}
 
 function WidgetTypeCard({
   configurable,
@@ -1762,34 +1035,62 @@ function WidgetTypeCard({
   );
 }
 
-function WidgetSizePreview() {
+function WidgetPanelCustomWidgetsEntry({
+  onOpenManageCustomWidgets,
+}: {
+  onOpenManageCustomWidgets: () => void;
+}) {
   return (
-    <div className="widget-size-preview" aria-hidden="true">
-      <div className="widget-size-preview-selected">
-        <span>3x3</span>
+    <section className="widget-type-list-footer" data-node-id="309:25159">
+      <hr className="widget-type-list-footer-divider" />
+      <div className="widget-type-list-footer-actions">
+        <p className="widget-type-list-footer-copy">
+          Can&apos;t find the widgets you need?
+          <br />
+          Try create your own widgets.
+        </p>
+        <button
+          className="widget-type-list-footer-link"
+          onClick={onOpenManageCustomWidgets}
+          type="button"
+        >
+          <WidgetsOutlinedIcon aria-hidden="true" />
+          <span>Custom Widgets</span>
+        </button>
       </div>
-      <div className="widget-size-preview-grid">
-        {Array.from({ length: 9 }, (_, index) => (
-          <span className="widget-size-preview-cell" key={index} />
-        ))}
-      </div>
-    </div>
+    </section>
   );
 }
 
 function AddWidgetPanel({
+  customWidgets,
   onClose,
+  onOpenManageCustomWidgets,
+  onSelectCustomWidget,
   onSelectWidget,
   searchQuery,
   onSearchQueryChange,
 }: {
+  customWidgets: CustomWidget[];
   onClose: () => void;
+  onOpenManageCustomWidgets: () => void;
+  onSelectCustomWidget: (widgetId: string) => void;
   onSelectWidget: (widgetId: (typeof WIDGET_TYPES)[number]["id"]) => void;
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
 }) {
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const visibleWidgets = WIDGET_TYPES.filter((widget) => {
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return (
+      widget.name.toLowerCase().includes(normalizedQuery) ||
+      widget.description.toLowerCase().includes(normalizedQuery)
+    );
+  });
+  const visibleCustomWidgets = customWidgets.filter((widget) => {
     if (!normalizedQuery) {
       return true;
     }
@@ -1828,9 +1129,29 @@ function AddWidgetPanel({
               onSelect={() => onSelectWidget(widget.id)}
             />
           ))
-        ) : (
+        ) : null}
+        {visibleCustomWidgets.map((widget) => (
+          <article className="widget-type-card" key={widget.id}>
+            <div className="widget-type-card-copy">
+              <strong>{widget.name}</strong>
+              <p>{widget.description}</p>
+            </div>
+            <div className="widget-type-card-actions">
+              <span className="widget-type-custom-tag">Custom</span>
+              <button
+                className="widget-type-select-button"
+                onClick={() => onSelectCustomWidget(widget.id)}
+                type="button"
+              >
+                Select
+              </button>
+            </div>
+          </article>
+        ))}
+        {visibleWidgets.length === 0 && visibleCustomWidgets.length === 0 ? (
           <p className="widget-type-empty">No widgets match your search.</p>
-        )}
+        ) : null}
+        <WidgetPanelCustomWidgetsEntry onOpenManageCustomWidgets={onOpenManageCustomWidgets} />
       </div>
     </WidgetDrawerShell>
   );
@@ -1886,23 +1207,41 @@ function ConfigureRevenueProgressPanel({
         <hr className="widget-config-divider" />
       </div>
 
-      <WidgetSizePreview />
+      <WidgetSizePreview size="3x3" />
     </WidgetDrawerShell>
   );
 }
 
 function WidgetDrawer({
+  configureCustomWidgetSize,
+  configureKind,
+  configuringCustomWidget,
+  customWidgets,
   onAddRevenueProgress,
   onBackToSelect,
   onClose,
+  onConfirmAddCustomWidget,
+  onConfigureCustomWidgetSizeChange,
+  onEditCustomWidgetFromDrawer,
+  onOpenManageCustomWidgets,
+  onSelectCustomWidget,
   onSelectWidget,
   searchQuery,
   onSearchQueryChange,
   step,
 }: {
+  configureCustomWidgetSize: CustomWidgetSize;
+  configureKind: WidgetDrawerConfigureKind;
+  configuringCustomWidget: CustomWidget | undefined;
+  customWidgets: CustomWidget[];
   onAddRevenueProgress: () => void;
   onBackToSelect: () => void;
   onClose: () => void;
+  onConfirmAddCustomWidget: () => void;
+  onConfigureCustomWidgetSizeChange: (size: CustomWidgetSize) => void;
+  onEditCustomWidgetFromDrawer: () => void;
+  onOpenManageCustomWidgets: () => void;
+  onSelectCustomWidget: (widgetId: string) => void;
   onSelectWidget: (widgetId: (typeof WIDGET_TYPES)[number]["id"]) => void;
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
@@ -1911,10 +1250,27 @@ function WidgetDrawer({
   if (step === "select") {
     return (
       <AddWidgetPanel
+        customWidgets={customWidgets}
         onClose={onClose}
+        onOpenManageCustomWidgets={onOpenManageCustomWidgets}
         onSearchQueryChange={onSearchQueryChange}
+        onSelectCustomWidget={onSelectCustomWidget}
         onSelectWidget={onSelectWidget}
         searchQuery={searchQuery}
+      />
+    );
+  }
+
+  if (configureKind === "custom-widget" && configuringCustomWidget) {
+    return (
+      <ConfigureCustomWidgetPanel
+        onAdd={onConfirmAddCustomWidget}
+        onBack={onBackToSelect}
+        onClose={onClose}
+        onEditCustomWidget={onEditCustomWidgetFromDrawer}
+        onSizeChange={onConfigureCustomWidgetSizeChange}
+        selectedSize={configureCustomWidgetSize}
+        widget={configuringCustomWidget}
       />
     );
   }
@@ -1971,14 +1327,12 @@ function NotificationBannerPagination({
 }
 
 function NotificationBannerRegion({
-  bannerPlacement,
   bannerPinned,
   onClose,
   anchorRef,
   pinnedShellRef,
   slotRef,
 }: {
-  bannerPlacement: BannerPlacement;
   bannerPinned: boolean;
   onClose: () => void;
   anchorRef: RefObject<HTMLDivElement | null>;
@@ -1987,7 +1341,7 @@ function NotificationBannerRegion({
 }) {
   const [activeAnnouncementIndex, setActiveAnnouncementIndex] = useState(0);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
-  const showPinnedOverlay = bannerPlacement === "pin-on-scroll" && bannerPinned;
+  const showPinnedOverlay = bannerPinned;
   const totalAnnouncements = notificationAnnouncements.length;
 
   useEffect(() => {
@@ -2019,24 +1373,22 @@ function NotificationBannerRegion({
           total={totalAnnouncements}
         />
       </div>
-      {bannerPlacement === "pin-on-scroll" ? (
-        <div
-          aria-hidden={!showPinnedOverlay || undefined}
-          className="notification-banner-fixed"
-          ref={pinnedShellRef}
-        >
-          <NotificationBanner
-            activeIndex={activeAnnouncementIndex}
-            detailsExpanded={detailsExpanded}
-            onClose={onClose}
-            onNext={handleNextAnnouncement}
-            onPrevious={handlePreviousAnnouncement}
-            onToggleDetails={() => setDetailsExpanded((current) => !current)}
-            pinned
-            total={totalAnnouncements}
-          />
-        </div>
-      ) : null}
+      <div
+        aria-hidden={!showPinnedOverlay || undefined}
+        className="notification-banner-fixed"
+        ref={pinnedShellRef}
+      >
+        <NotificationBanner
+          activeIndex={activeAnnouncementIndex}
+          detailsExpanded={detailsExpanded}
+          onClose={onClose}
+          onNext={handleNextAnnouncement}
+          onPrevious={handlePreviousAnnouncement}
+          onToggleDetails={() => setDetailsExpanded((current) => !current)}
+          pinned
+          total={totalAnnouncements}
+        />
+      </div>
     </div>
   );
 }
@@ -2136,24 +1488,26 @@ function NotificationBanner({
   );
 }
 
-function RevenueProgressToast({
+function FeedbackToast({
+  message,
   onClose,
   onViewWidget,
   showViewWidget,
 }: {
+  message: string;
   onClose: () => void;
-  onViewWidget: () => void;
-  showViewWidget: boolean;
+  onViewWidget?: () => void;
+  showViewWidget?: boolean;
 }) {
   return (
     <div className="feedback-toast" data-node-id="111:13461" role="status" aria-live="polite">
       <div className="feedback-toast-inner">
         <div className="feedback-toast-message">
           <InfoIcon aria-hidden="true" className="feedback-toast-info-icon" />
-          <p>Revenue Progress has been added.</p>
+          <p>{message}</p>
         </div>
         <div className="feedback-toast-actions">
-          {showViewWidget ? (
+          {showViewWidget && onViewWidget ? (
             <button className="feedback-toast-action" type="button" onClick={onViewWidget}>
               view Widget
             </button>
@@ -2168,43 +1522,284 @@ function RevenueProgressToast({
 }
 
 function DashboardGrid({
+  addedWidgetIds,
   addedWidgetRef,
+  getCustomWidgetById,
+  hiddenMetricCardLabels,
+  highlightedWidgetRefId,
+  isAiGenerated,
+  removedWidgetIds,
   revenueProgressAdded,
+  startWithEmptyHomepage,
+  widgetOrder,
 }: {
+  addedWidgetIds: string[];
   addedWidgetRef: RefObject<HTMLElement | null>;
+  getCustomWidgetById: (widgetId: string) => CustomWidget | undefined;
+  hiddenMetricCardLabels: string[];
+  highlightedWidgetRefId: string | null;
+  isAiGenerated: boolean;
+  removedWidgetIds: DashboardWidgetId[];
   revenueProgressAdded: boolean;
+  startWithEmptyHomepage: boolean;
+  widgetOrder: DashboardWidgetId[] | null;
 }) {
+  if (isAiGenerated) {
+    return (
+      <section className="dashboard-grid dashboard-grid-ai-generated" data-node-id="225:41367">
+        <AiGeneratedDashboard
+          addedWidgetIds={addedWidgetIds}
+          getCustomWidgetById={getCustomWidgetById}
+          hiddenMetricCardLabels={hiddenMetricCardLabels}
+          highlightedWidgetRefId={highlightedWidgetRefId}
+          widgetRef={addedWidgetRef}
+        />
+      </section>
+    );
+  }
+
+  const visibleWidgetIds = getCurrentDashboardWidgetIds({
+    addedWidgetIds,
+    layout: "default",
+    removedWidgetIds,
+    revenueProgressAdded,
+    startWithEmptyHomepage,
+    widgetOrder,
+  });
+
   return (
     <section className="dashboard-grid" data-node-id="1:57116">
-      <RevenueOverview />
-      <RevenueTasks />
-      <RunReport />
-      <RunProgram />
-      <FileUpload />
-      <ActiveBatches />
-      <RCSearch />
-      {revenueProgressAdded ? <CloseProcessStatus widgetRef={addedWidgetRef} /> : null}
+      {visibleWidgetIds.map((widgetId) => (
+        <DashboardWidget
+          key={widgetId}
+          widgetId={widgetId}
+          widgetRef={widgetId === "revenue-progress" ? addedWidgetRef : undefined}
+        />
+      ))}
+      <HomepageCustomWidgets
+        addedWidgetIds={addedWidgetIds}
+        getCustomWidgetById={getCustomWidgetById}
+        highlightedWidgetRefId={highlightedWidgetRefId}
+        widgetRef={addedWidgetRef}
+      />
     </section>
   );
 }
 
+type FeedbackToastState = {
+  message: string;
+  showViewWidgetAction?: boolean;
+};
+
+const FEEDBACK_TOAST_DURATION_MS = 3000;
+
 export function App() {
+  const customWidgetEditorCapture = getCustomWidgetEditorCaptureConfig();
+  const [showOnboarding, setShowOnboarding] = useState(() => !customWidgetEditorCapture);
+  const [startWithEmptyHomepage, setStartWithEmptyHomepage] = useState(false);
   const [actionsLayout] = useState(getActionsLayout);
-  const [bannerPlacement, setBannerPlacement] = useState(getBannerPlacement);
   const [revenueProgressAdded, setRevenueProgressAdded] = useState(false);
-  const [feedbackToastVisible, setFeedbackToastVisible] = useState(false);
+  const [feedbackToast, setFeedbackToast] = useState<FeedbackToastState | null>(null);
+  const {
+    addWidgets,
+    addedWidgetIds,
+    applyAiGeneratedLayout,
+    applyCleanupPlan,
+    hiddenMetricCardLabels,
+    isAiGenerated,
+    layout,
+    removedWidgetIds,
+    resetToDefaultLayout,
+    undoCleanup,
+    widgetOrder,
+  } = useHomepageConfig();
+  const {
+    clearHistory,
+    deleteWidget,
+    draftWidgets,
+    getWidgetById,
+    historyEntries,
+    publishedWidgets,
+    saveWidget,
+    widgets,
+  } = useCustomWidgets();
+  const [homepageView, setHomepageView] = useState<HomepageView>(() =>
+    customWidgetEditorCapture ? "create-widget" : "home",
+  );
+  const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+  const [aiSuggestedWidgetDraft, setAiSuggestedWidgetDraft] = useState<CustomWidgetDraft | null>(null);
+  const [aiSuggestedEditorStep, setAiSuggestedEditorStep] = useState<EditorStep | null>(null);
+  const [aiSuggestedTemplateDraft, setAiSuggestedTemplateDraft] =
+    useState<HomepageTemplateDraft | null>(null);
+  const [manageWidgetsTab, setManageWidgetsTab] = useState<ManageWidgetsTab>("published");
+  const [homepageMenuOpen, setHomepageMenuOpen] = useState(false);
+  const configureActionsRef = useRef<HTMLDivElement | null>(null);
+  const cleanupRevenueProgressSnapshot = useRef(false);
+  const showFeedbackToast = useCallback((message: string, options?: { showViewWidgetAction?: boolean }) => {
+    setFeedbackToast({
+      message,
+      showViewWidgetAction: options?.showViewWidgetAction,
+    });
+  }, []);
+  const dismissFeedbackToast = useCallback(() => {
+    setFeedbackToast(null);
+  }, []);
+  const handleAddRecommendedWidgets = useCallback(
+    (widgetIds: string[]) => {
+      addWidgets(widgetIds);
+
+      if (!isAiGenerated && widgetIds.includes("revenue-progress")) {
+        setRevenueProgressAdded(true);
+        setHighlightedWidgetRefId("revenue-progress");
+        showFeedbackToast("Revenue Progress has been added.", { showViewWidgetAction: true });
+      }
+    },
+    [addWidgets, isAiGenerated, showFeedbackToast],
+  );
+  const handleApplyCleanup = useCallback(
+    (plan: HomepageCleanupPlan) => {
+      cleanupRevenueProgressSnapshot.current = revenueProgressAdded;
+      applyCleanupPlan(plan);
+
+      if (plan.removedWidgetIds.includes("revenue-progress")) {
+        setRevenueProgressAdded(false);
+      }
+    },
+    [applyCleanupPlan, revenueProgressAdded],
+  );
+  const handleUndoCleanup = useCallback(() => {
+    undoCleanup();
+    setRevenueProgressAdded(cleanupRevenueProgressSnapshot.current);
+  }, [undoCleanup]);
+  const handleCreateProposedCustomWidget = useCallback(
+    (proposal: CustomWidgetProposal, widgetId?: string) => {
+      const liveProposal = buildTopAccountsLiveDataProposal();
+
+      if (widgetId) {
+        setEditingWidgetId(widgetId);
+        setAiSuggestedWidgetDraft(null);
+      } else {
+        setAiSuggestedWidgetDraft(proposal.draft ?? liveProposal.draft);
+        setEditingWidgetId(null);
+      }
+
+      setAiSuggestedEditorStep("configure");
+      setShowOnboarding(false);
+      setHomepageView("create-widget");
+    },
+    [],
+  );
+  const handleAddProposedCustomWidgetToHomepage = useCallback(
+    (proposal: CustomWidgetProposal) => {
+      if (!proposal.supportsLiveData) {
+        return undefined;
+      }
+
+      const liveProposal = buildTopAccountsLiveDataProposal();
+      const widgetId = saveWidget({ ...liveProposal.draft, status: "published" });
+      const refId = createCustomWidgetRefId(widgetId, liveProposal.draft.size);
+
+      addWidgets([refId]);
+      setHighlightedWidgetRefId(refId);
+      setShowOnboarding(false);
+      setHomepageView("home");
+      showFeedbackToast(`${liveProposal.draft.name?.trim() || "Custom widget"} has been added.`, {
+        showViewWidgetAction: true,
+      });
+
+      return widgetId;
+    },
+    [addWidgets, saveWidget, showFeedbackToast],
+  );
+  const handleCreateProposedTeamTemplate = useCallback(
+    (proposal: TeamTemplateProposal) => {
+      setAiSuggestedTemplateDraft(createTemplateDraftFromProposal(proposal));
+      setShowOnboarding(false);
+      setHomepageView("edit-template");
+    },
+    [],
+  );
+  const handleCloseTemplateEditor = useCallback(() => {
+    setAiSuggestedTemplateDraft(null);
+    setHomepageView("home");
+  }, []);
+  const handleSaveTemplateDraft = useCallback(
+    (draft: HomepageTemplateDraft) => {
+      setAiSuggestedTemplateDraft(draft);
+      showFeedbackToast(`${draft.name} template draft saved.`);
+    },
+    [showFeedbackToast],
+  );
+  const handlePublishTemplateDraft = useCallback(
+    (draft: HomepageTemplateDraft) => {
+      addWidgets([...draft.dashboardWidgetIds, ...draft.customWidgetRefs]);
+      setAiSuggestedTemplateDraft({ ...draft, status: "published" });
+      showFeedbackToast(`${draft.name} template published for your team.`);
+    },
+    [addWidgets, showFeedbackToast],
+  );
+  const isEmptyHomepage = startWithEmptyHomepage && !isAiGenerated;
+  const {
+    aiChatOpen,
+    closeChat,
+    handleAddRecommendedWidgets: handleChatAddRecommendedWidgets,
+    handleApplyCleanup: handleChatApplyCleanup,
+    handleApplyPreview,
+    handleAddProposedCustomWidgetToHomepage: handleChatAddProposedCustomWidgetToHomepage,
+    handleCreateProposedTeamTemplate: handleChatCreateProposedTeamTemplate,
+    handleCreateWithLiveData: handleChatCreateWithLiveData,
+    handleNewChat,
+    handleRegeneratePreview,
+    handleSendMessage,
+    handleSuggestedAction,
+    handleUndoCleanup: handleChatUndoCleanup,
+    handleUndoPreview,
+    isThinking,
+    messages,
+    openChat,
+    startChat,
+    suggestionContext,
+    suggestions,
+    thinkingProcess,
+  } = useAiHomepageConfigChat({
+    addedWidgetIds,
+    extraExcludedWidgetIds: revenueProgressAdded ? ["revenue-progress"] : [],
+    hiddenMetricCardLabels,
+    isAiGenerated,
+    isEmptyHomepage,
+    layout,
+    onAddWidgets: handleAddRecommendedWidgets,
+    onApplyCleanup: handleApplyCleanup,
+    onApplyPreview: applyAiGeneratedLayout,
+    onAddProposedCustomWidgetToHomepage: handleAddProposedCustomWidgetToHomepage,
+    onCreateProposedCustomWidget: handleCreateProposedCustomWidget,
+    onCreateProposedTeamTemplate: handleCreateProposedTeamTemplate,
+    onUndoCleanup: handleUndoCleanup,
+    onUndoPreview: resetToDefaultLayout,
+    removedWidgetIds,
+    revenueProgressAdded,
+    widgetOrder,
+  });
   const [feedbackShowViewWidget, setFeedbackShowViewWidget] = useState(false);
   const [widgetDrawerStep, setWidgetDrawerStep] = useState<WidgetDrawerStep>("closed");
+  const [widgetDrawerConfigureKind, setWidgetDrawerConfigureKind] =
+    useState<WidgetDrawerConfigureKind>("revenue-progress");
+  const [configuringCustomWidgetId, setConfiguringCustomWidgetId] = useState<string | null>(null);
+  const [configureCustomWidgetSize, setConfigureCustomWidgetSize] = useState<CustomWidgetSize>("3x3");
+  const [widgetDrawerConfigureEntry, setWidgetDrawerConfigureEntry] =
+    useState<WidgetDrawerConfigureEntry>("select");
   const [widgetSearchQuery, setWidgetSearchQuery] = useState("");
+  const [highlightedWidgetRefId, setHighlightedWidgetRefId] = useState<string | null>(null);
   const [notificationBannerVisible, setNotificationBannerVisible] = useState(true);
-  const [announcementScrollAnimating, setAnnouncementScrollAnimating] = useState(false);
-  const [aiChatOpen, setAiChatOpen] = useState(false);
   const addedWidgetRef = useRef<HTMLElement | null>(null);
-  const { progress, scrollRef } = useStickyProgress();
+  const homepageActive = !showOnboarding;
+  const hasAddedWidgets = addedWidgetIds.length > 0 || revenueProgressAdded;
+  const isNotificationBannerActive = notificationBannerVisible && !isEmptyHomepage;
+  const bannerAffectsHero = isNotificationBannerActive;
+  const { progress, scrollRef } = useStickyProgress(homepageActive);
   const surfaceProgress = easeInOut(rangeProgress(progress, 0.08, 0.64));
-  const bannerAffectsHero = notificationBannerVisible;
   const { bannerAnchorRef, bannerPinned, bannerPinnedShellRef, bannerSlotRef, pinnedBannerHeight } =
-    useBannerPinMotion(bannerPlacement, notificationBannerVisible, scrollRef);
+    useBannerPinMotion(isNotificationBannerActive, scrollRef, homepageActive);
   const titleMorphProgress = easeInOut(rangeProgress(progress, 0.04, 0.76));
   const titleScaleProgress = easeInOut(rangeProgress(progress, 0.02, 0.92));
   const actionsProgress = easeInOut(rangeProgress(progress, 0.18, 0.82));
@@ -2214,21 +1809,231 @@ export function App() {
     actionsLayout,
     bannerPinned ? pinnedBannerHeight : 0,
     aiChatOpen,
-    notificationBannerVisible,
+    isNotificationBannerActive,
     bannerPinned,
+    homepageActive,
   );
   const searchMorphGeometry = useSearchMorphGeometry(
     actionsMorphProgress,
     bannerAffectsHero,
     bannerPinned ? pinnedBannerHeight : 0,
+    homepageActive,
   );
   const welcomeOutProgress = easeInOut(rangeProgress(progress, 0.08, 0.55));
-  const welcomeTitleMorphY = useWelcomeHeroMorphY(bannerAffectsHero);
-  const chipReturnTitleActive = bannerPlacement === "chip-on-scroll" && announcementScrollAnimating;
-  const chipReturnCenterPhase = chipReturnTitleActive ? rangeProgress(0.25 - progress, 0, 0.25) : 0;
-  const effectiveTitleMorphProgress = chipReturnTitleActive
-    ? Math.max(0, 1 - easeInOut(chipReturnCenterPhase))
-    : titleMorphProgress;
+  const welcomeTitleMorphY = useWelcomeHeroMorphY(bannerAffectsHero, homepageActive, scrollRef);
+
+  const handleSelectOnboardingTemplate = useCallback(
+    (_templateId: OnboardingTemplateId) => {
+      resetToDefaultLayout();
+      setRevenueProgressAdded(false);
+      setStartWithEmptyHomepage(false);
+      setHomepageView("home");
+      setShowOnboarding(false);
+    },
+    [resetToDefaultLayout],
+  );
+
+  const handleCreateWithZuoraAi = useCallback(() => {
+    resetToDefaultLayout();
+    setRevenueProgressAdded(false);
+    setNotificationBannerVisible(false);
+    setStartWithEmptyHomepage(true);
+    setShowOnboarding(false);
+    setHomepageView("home");
+    startChat({ context: "homepage", reset: true });
+  }, [resetToDefaultLayout, startChat]);
+
+  const handleOpenManageCustomWidgetsFromDrawer = useCallback(() => {
+    setWidgetDrawerStep("closed");
+    setWidgetSearchQuery("");
+    setConfiguringCustomWidgetId(null);
+    setWidgetDrawerConfigureEntry("select");
+    setWidgetDrawerConfigureKind("revenue-progress");
+    setHomepageView("manage-custom-widgets");
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollRef]);
+
+  const handleOpenManageHub = useCallback(() => {
+    setHomepageView("manage-hub");
+    setHomepageMenuOpen(false);
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollRef]);
+
+  const handleOpenManageCustomWidgets = useCallback(() => {
+    setHomepageView("manage-custom-widgets");
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollRef]);
+
+  const handleGoHome = useCallback(() => {
+    setHomepageView("home");
+    setEditingWidgetId(null);
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollRef]);
+
+  const handleOpenAiChatFromManageWidgets = useCallback(() => {
+    startChat({ context: "custom-widget", reset: true });
+  }, [startChat]);
+
+  const handleCreateCustomWidget = useCallback(() => {
+    setAiSuggestedWidgetDraft(null);
+    setAiSuggestedEditorStep(null);
+    setEditingWidgetId(null);
+    setHomepageView("create-widget");
+  }, []);
+
+  const handleEditCustomWidget = useCallback((widgetId: string) => {
+    setEditingWidgetId(widgetId);
+    setHomepageView("edit-widget");
+  }, []);
+
+  const handleCloseCustomWidgetEditor = useCallback(() => {
+    setHomepageView("manage-custom-widgets");
+    setEditingWidgetId(null);
+    setAiSuggestedWidgetDraft(null);
+    setAiSuggestedEditorStep(null);
+  }, []);
+
+  const handleSaveCustomWidget = useCallback(
+    (draft: Parameters<typeof saveWidget>[0]) => {
+      flushSync(() => {
+        showFeedbackToast("Custom widget saved.");
+      });
+
+      const widgetId = saveWidget(draft, editingWidgetId ?? undefined);
+
+      if (widgetId !== editingWidgetId) {
+        setEditingWidgetId(widgetId);
+      }
+    },
+    [editingWidgetId, saveWidget, showFeedbackToast],
+  );
+
+  const handlePublishCustomWidget = useCallback(
+    (draft: Parameters<typeof saveWidget>[0]) => {
+      saveWidget({ ...draft, status: "published" }, editingWidgetId ?? undefined);
+      setEditingWidgetId(null);
+      setManageWidgetsTab("published");
+      setHomepageView("manage-custom-widgets");
+      showFeedbackToast("Custom widget published.");
+    },
+    [editingWidgetId, saveWidget, showFeedbackToast],
+  );
+
+  const handleUnpublishCustomWidget = useCallback(
+    (draft: Parameters<typeof saveWidget>[0]) => {
+      saveWidget({ ...draft, status: "draft" }, editingWidgetId ?? undefined);
+      setEditingWidgetId(null);
+      setManageWidgetsTab("drafts");
+      setHomepageView("manage-custom-widgets");
+      showFeedbackToast("Custom widget unpublished.");
+    },
+    [editingWidgetId, saveWidget, showFeedbackToast],
+  );
+
+  const handleDeleteCustomWidget = useCallback(() => {
+    if (!editingWidgetId) {
+      return;
+    }
+
+    deleteWidget(editingWidgetId);
+    setEditingWidgetId(null);
+    setHomepageView("manage-custom-widgets");
+    showFeedbackToast("Custom widget deleted.");
+  }, [deleteWidget, editingWidgetId, showFeedbackToast]);
+
+  const handleDeleteCustomWidgetFromList = useCallback(
+    (widgetId: string) => {
+      deleteWidget(widgetId);
+      showFeedbackToast("Custom widget deleted.");
+    },
+    [deleteWidget, showFeedbackToast],
+  );
+
+  const handleResetHomepage = useCallback(() => {
+    resetToDefaultLayout();
+    setRevenueProgressAdded(false);
+    setStartWithEmptyHomepage(false);
+    setHomepageMenuOpen(false);
+  }, [resetToDefaultLayout]);
+
+  const handleAddCustomWidgetToHomepage = useCallback(
+    (widgetId: string, size: CustomWidgetSize) => {
+      const refId = createCustomWidgetRefId(widgetId, size);
+      addWidgets([refId]);
+      setHighlightedWidgetRefId(refId);
+      setWidgetDrawerStep("closed");
+      setWidgetSearchQuery("");
+      setConfiguringCustomWidgetId(null);
+      setWidgetDrawerConfigureEntry("select");
+      setWidgetDrawerConfigureKind("revenue-progress");
+
+      const widget = getWidgetById(widgetId);
+      showFeedbackToast(`${widget?.name?.trim() || "Custom widget"} has been added.`, {
+        showViewWidgetAction: true,
+      });
+    },
+    [addWidgets, getWidgetById, showFeedbackToast],
+  );
+
+  const handleAddPublishedWidgetToHomepage = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+
+      if (!widget || widget.status !== "published" || widget.supportedSizes.length === 0) {
+        return;
+      }
+
+      setWidgetDrawerConfigureEntry("direct");
+      setWidgetDrawerConfigureKind("custom-widget");
+      setConfiguringCustomWidgetId(widgetId);
+      setConfigureCustomWidgetSize(
+        widget.supportedSizes.includes(widget.size) ? widget.size : widget.supportedSizes[0],
+      );
+      setWidgetDrawerStep("configure");
+    },
+    [getWidgetById],
+  );
+
+  const handleSelectCustomWidget = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+
+      if (!widget || widget.supportedSizes.length === 0) {
+        return;
+      }
+
+      setWidgetDrawerConfigureEntry("select");
+      setWidgetDrawerConfigureKind("custom-widget");
+      setConfiguringCustomWidgetId(widgetId);
+      setConfigureCustomWidgetSize(
+        widget.supportedSizes.includes(widget.size) ? widget.size : widget.supportedSizes[0],
+      );
+      setWidgetDrawerStep("configure");
+    },
+    [getWidgetById],
+  );
+
+  const handleConfirmAddCustomWidget = useCallback(() => {
+    if (!configuringCustomWidgetId) {
+      return;
+    }
+
+    handleAddCustomWidgetToHomepage(configuringCustomWidgetId, configureCustomWidgetSize);
+  }, [configureCustomWidgetSize, configuringCustomWidgetId, handleAddCustomWidgetToHomepage]);
+
+  const handleEditCustomWidgetFromDrawer = useCallback(() => {
+    if (!configuringCustomWidgetId) {
+      return;
+    }
+
+    setEditingWidgetId(configuringCustomWidgetId);
+    setHomepageView("edit-widget");
+    setWidgetDrawerStep("closed");
+    setWidgetSearchQuery("");
+    setConfiguringCustomWidgetId(null);
+    setWidgetDrawerConfigureEntry("select");
+    setWidgetDrawerConfigureKind("revenue-progress");
+  }, [configuringCustomWidgetId]);
 
   const stickyStyle = {
     "--sticky-progress": progress,
@@ -2238,13 +2043,12 @@ export function App() {
     "--configure-button-y": `${(1 - actionsMorphProgress) * 44}px`,
     "--sticky-surface-opacity": surfaceProgress,
     "--sticky-title-opacity": 1,
-    "--chip-return-center-phase": chipReturnCenterPhase,
-    "--title-morph-left": `calc(${50 - effectiveTitleMorphProgress * 50}% + ${effectiveTitleMorphProgress * 16}px)`,
+    "--title-morph-left": `calc(${50 - titleMorphProgress * 50}% + ${titleMorphProgress * 16}px)`,
     "--title-morph-top": "8px",
     "--title-morph-font-size": `${OCCAM_HEADLINE_L_SIZE}px`,
     "--title-morph-line-height": `${OCCAM_HEADLINE_L_LINE_HEIGHT}px`,
     "--sticky-title-scale": 1 - titleScaleProgress * (1 - STICKY_TITLE_SCALE),
-    "--sticky-title-x": `calc(${-50 + effectiveTitleMorphProgress * 50}%)`,
+    "--sticky-title-x": `calc(${-50 + titleMorphProgress * 50}%)`,
     "--sticky-title-y": `${(1 - titleMorphProgress) * welcomeTitleMorphY}px`,
     ...searchMorphGeometry,
     "--sticky-actions-opacity": actionsProgress,
@@ -2260,49 +2064,19 @@ export function App() {
       : `${NOTIFICATION_BANNER_PINNED_HEIGHT_FALLBACK}px`,
   } as StickyProgressStyle;
   const stickyControlsActive = progress > 0.48;
-  const bannerChipEligible = useBannerChipVisibility(
-    bannerPlacement,
-    notificationBannerVisible,
-    scrollRef,
-    bannerSlotRef,
-    stickyControlsActive,
-  );
-  const showAnnouncementChip = bannerChipEligible && !announcementScrollAnimating;
-  const handleAnnouncementChipClick = () => {
-    const scrollNode = scrollRef.current;
-
-    if (!scrollNode) {
-      window.scrollTo({ top: 0, behavior: "auto" });
-      return;
-    }
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      scrollNode.scrollTop = 0;
-      return;
-    }
-
-    if (announcementScrollAnimating || scrollNode.scrollTop <= 0) {
-      return;
-    }
-
-    const duration = Math.min(900, Math.max(550, scrollNode.scrollTop * 2.2));
-
-    setAnnouncementScrollAnimating(true);
-    void smoothScrollTo(scrollNode, 0, duration).finally(() => {
-      setAnnouncementScrollAnimating(false);
-    });
-  };
-  const handleBannerPlacementChange = (nextBannerPlacement: BannerPlacement) => {
-    setBannerPlacement(nextBannerPlacement);
-    syncBannerPlacementUrl(nextBannerPlacement);
-  };
   const handleOpenAddWidgetPanel = () => {
     setWidgetSearchQuery("");
+    setConfiguringCustomWidgetId(null);
+    setWidgetDrawerConfigureEntry("select");
+    setWidgetDrawerConfigureKind("revenue-progress");
     setWidgetDrawerStep("select");
   };
   const handleCloseWidgetDrawer = () => {
     setWidgetDrawerStep("closed");
     setWidgetSearchQuery("");
+    setConfiguringCustomWidgetId(null);
+    setWidgetDrawerConfigureEntry("select");
+    setWidgetDrawerConfigureKind("revenue-progress");
   };
   const handleSelectWidgetType = (widgetId: (typeof WIDGET_TYPES)[number]["id"]) => {
     const widget = WIDGET_TYPES.find((entry) => entry.id === widgetId);
@@ -2311,24 +2085,39 @@ export function App() {
       return;
     }
 
+    setWidgetDrawerConfigureKind("revenue-progress");
+    setConfiguringCustomWidgetId(null);
     setWidgetDrawerStep("configure");
   };
   const handleBackToWidgetSelect = () => {
     setWidgetDrawerStep("select");
+    setConfiguringCustomWidgetId(null);
+    setWidgetDrawerConfigureEntry("select");
+    setWidgetDrawerConfigureKind("revenue-progress");
+  };
+  const handleConfigureBack = () => {
+    if (widgetDrawerConfigureKind === "custom-widget" && widgetDrawerConfigureEntry === "direct") {
+      handleCloseWidgetDrawer();
+      return;
+    }
+
+    handleBackToWidgetSelect();
   };
   const handleConfirmAddRevenueProgress = () => {
     handleCloseWidgetDrawer();
 
     if (revenueProgressAdded) {
-      setFeedbackToastVisible(true);
+      setHighlightedWidgetRefId("revenue-progress");
+      showFeedbackToast("Revenue Progress has been added.", { showViewWidgetAction: true });
       return;
     }
 
     setRevenueProgressAdded(true);
-    setFeedbackToastVisible(true);
+    setHighlightedWidgetRefId("revenue-progress");
+    showFeedbackToast("Revenue Progress has been added.", { showViewWidgetAction: true });
   };
   const handleViewAddedWidget = () => {
-    setFeedbackToastVisible(false);
+    dismissFeedbackToast();
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -2363,9 +2152,19 @@ export function App() {
       window.setTimeout(finishViewAddedWidget, reducedMotion ? 0 : 500);
     };
 
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(scrollToAddedWidget);
-    });
+    const runScrollToAddedWidget = () => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(scrollToAddedWidget);
+      });
+    };
+
+    if (homepageView !== "home") {
+      handleGoHome();
+      runScrollToAddedWidget();
+      return;
+    }
+
+    runScrollToAddedWidget();
   };
 
   useEffect(() => {
@@ -2377,6 +2176,9 @@ export function App() {
       if (event.key === "Escape") {
         setWidgetDrawerStep("closed");
         setWidgetSearchQuery("");
+        setConfiguringCustomWidgetId(null);
+        setWidgetDrawerConfigureEntry("select");
+        setWidgetDrawerConfigureKind("revenue-progress");
       }
     };
 
@@ -2388,32 +2190,36 @@ export function App() {
   }, [widgetDrawerStep]);
 
   useEffect(() => {
-    if (!feedbackToastVisible) {
+    if (!feedbackToast) {
       setFeedbackShowViewWidget(false);
       return undefined;
     }
 
     let frame = 0;
 
-    const measureViewWidgetVisibility = () => {
-      const widgetNode = addedWidgetRef.current;
-      const scrollNode = scrollRef.current;
+    if (feedbackToast.showViewWidgetAction) {
+      const measureViewWidgetVisibility = () => {
+        const widgetNode = addedWidgetRef.current;
+        const scrollNode = scrollRef.current;
 
-      if (widgetNode && scrollNode) {
-        setFeedbackShowViewWidget(!isElementVisibleInScrollContainer(widgetNode, scrollNode));
-        return;
-      }
+        if (widgetNode && scrollNode) {
+          setFeedbackShowViewWidget(!isElementVisibleInScrollContainer(widgetNode, scrollNode));
+          return;
+        }
 
-      setFeedbackShowViewWidget(true);
-    };
+        setFeedbackShowViewWidget(true);
+      };
 
-    frame = window.requestAnimationFrame(() => {
-      frame = window.requestAnimationFrame(measureViewWidgetVisibility);
-    });
+      frame = window.requestAnimationFrame(() => {
+        frame = window.requestAnimationFrame(measureViewWidgetVisibility);
+      });
+    } else {
+      setFeedbackShowViewWidget(false);
+    }
 
     const timeout = window.setTimeout(() => {
-      setFeedbackToastVisible(false);
-    }, 8000);
+      setFeedbackToast(null);
+    }, FEEDBACK_TOAST_DURATION_MS);
 
     return () => {
       if (frame) {
@@ -2422,84 +2228,248 @@ export function App() {
 
       window.clearTimeout(timeout);
     };
-  }, [feedbackToastVisible, revenueProgressAdded, scrollRef]);
+  }, [feedbackToast, scrollRef]);
 
   useEffect(() => {
     window.dispatchEvent(new Event("resize"));
   }, [aiChatOpen]);
 
-  return (
+  useEffect(() => {
+    if (showOnboarding) {
+      return undefined;
+    }
+
+    const scrollNode = scrollRef.current;
+    scrollNode?.scrollTo({ top: 0 });
+
+    let frame = window.requestAnimationFrame(() => {
+      frame = window.requestAnimationFrame(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [scrollRef, showOnboarding]);
+
+  const editingWidget = editingWidgetId ? getWidgetById(editingWidgetId) : undefined;
+  const configuringCustomWidget = configuringCustomWidgetId
+    ? getWidgetById(configuringCustomWidgetId)
+    : undefined;
+  const customWidgetSummary =
+    widgets.length === 0
+      ? "You don't have any custom widgets yet."
+      : `${publishedWidgets.length} Published, ${draftWidgets.length} Drafts`;
+  const isHomeView = homepageView === "home";
+  const isEditorOpen = homepageView === "create-widget" || homepageView === "edit-widget";
+  const isTemplateEditorOpen = homepageView === "edit-template";
+  const isWidgetDrawerOpen = widgetDrawerStep !== "closed";
+  const isWidgetDrawerOverlay =
+    isWidgetDrawerOpen &&
+    !isHomeView &&
+    widgetDrawerConfigureEntry === "direct" &&
+    widgetDrawerStep === "configure" &&
+    widgetDrawerConfigureKind === "custom-widget";
+  const showWidgetDrawer = isWidgetDrawerOpen && (isHomeView || isWidgetDrawerOverlay);
+
+  return showOnboarding ? (
+    <OnboardingScreen
+      onCreateWithAi={handleCreateWithZuoraAi}
+      onSelectTemplate={handleSelectOnboardingTemplate}
+    />
+  ) : (
     <div className="nebula-shell" data-ai-chat-open={aiChatOpen || undefined}>
       <GlobalNav />
       <div className="homepage-workspace">
         <main
           className="homepage-main"
           data-actions-layout={actionsLayout}
-          data-announcement-chip-visible={showAnnouncementChip || undefined}
-          data-announcement-scroll-animating={announcementScrollAnimating || undefined}
-          data-chip-return-centering={chipReturnCenterPhase > 0.001 || undefined}
+          data-ai-homepage-applied={isAiGenerated || undefined}
           data-banner-affects-hero={bannerAffectsHero || undefined}
           data-banner-pinned={bannerPinned || undefined}
-          data-banner-placement={bannerPlacement}
           data-node-id="1:57107"
-          data-notification-visible={notificationBannerVisible || undefined}
+          data-notification-visible={isNotificationBannerActive || undefined}
           data-sticky-state={progress >= 1 ? "stuck" : "default"}
           ref={scrollRef}
           style={stickyStyle}
           tabIndex={0}
         >
-        <StickyHeader
-          active={stickyControlsActive}
-          announcementCount={notificationAnnouncements.length}
-          onAnnouncementChipClick={handleAnnouncementChipClick}
-          showAnnouncementChip={showAnnouncementChip}
-        />
-        <MorphingSearchField />
-        <MorphingFloatingActions onOpenAddWidgetPanel={handleOpenAddWidgetPanel} />
-        <PrototypeControls
-          bannerPlacement={bannerPlacement}
-          onBannerPlacementChange={handleBannerPlacementChange}
-        />
-        {widgetDrawerStep !== "closed" && (
-          <WidgetDrawer
-            onAddRevenueProgress={handleConfirmAddRevenueProgress}
-            onBackToSelect={handleBackToWidgetSelect}
-            onClose={handleCloseWidgetDrawer}
-            onSearchQueryChange={setWidgetSearchQuery}
-            onSelectWidget={handleSelectWidgetType}
-            searchQuery={widgetSearchQuery}
-            step={widgetDrawerStep}
+        <StickyHeader active={stickyControlsActive && isHomeView} visible={isHomeView} />
+        {isHomeView ? <MorphingSearchField /> : null}
+        {isHomeView ? (
+          <MorphingFloatingActions
+            configureActionsRef={configureActionsRef}
+            homepageMenuOpen={homepageMenuOpen}
+            onCloseHomepageMenu={() => setHomepageMenuOpen(false)}
+            onOpenAddWidgetPanel={handleOpenAddWidgetPanel}
+            onOpenManageHub={handleOpenManageHub}
+            onResetHomepage={handleResetHomepage}
+            onToggleHomepageMenu={() => setHomepageMenuOpen((current) => !current)}
           />
-        )}
-        {feedbackToastVisible && (
-          <RevenueProgressToast
-            onClose={() => setFeedbackToastVisible(false)}
+        ) : null}
+        {showWidgetDrawer ? (
+          <div className={isWidgetDrawerOverlay ? "widget-drawer-overlay-host" : undefined}>
+            <WidgetDrawer
+              configureCustomWidgetSize={configureCustomWidgetSize}
+              configureKind={widgetDrawerConfigureKind}
+              configuringCustomWidget={configuringCustomWidget}
+              customWidgets={publishedWidgets}
+              onAddRevenueProgress={handleConfirmAddRevenueProgress}
+              onBackToSelect={handleConfigureBack}
+              onClose={handleCloseWidgetDrawer}
+              onConfirmAddCustomWidget={handleConfirmAddCustomWidget}
+              onConfigureCustomWidgetSizeChange={setConfigureCustomWidgetSize}
+              onEditCustomWidgetFromDrawer={handleEditCustomWidgetFromDrawer}
+              onOpenManageCustomWidgets={handleOpenManageCustomWidgetsFromDrawer}
+              onSearchQueryChange={setWidgetSearchQuery}
+              onSelectCustomWidget={handleSelectCustomWidget}
+              onSelectWidget={handleSelectWidgetType}
+              searchQuery={widgetSearchQuery}
+              step={widgetDrawerStep}
+            />
+          </div>
+        ) : null}
+        {feedbackToast ? (
+          <FeedbackToast
+            message={feedbackToast.message}
+            onClose={dismissFeedbackToast}
             onViewWidget={handleViewAddedWidget}
-            showViewWidget={feedbackShowViewWidget}
+            showViewWidget={Boolean(feedbackToast.showViewWidgetAction && feedbackShowViewWidget)}
           />
-        )}
+        ) : null}
         <div
           className="scrolled-content"
           data-node-id="1:57108"
           data-revenue-progress-added={revenueProgressAdded || undefined}
         >
-          {notificationBannerVisible ? (
-            <NotificationBannerRegion
-              anchorRef={bannerAnchorRef}
-              bannerPinned={bannerPinned}
-              bannerPlacement={bannerPlacement}
-              onClose={() => setNotificationBannerVisible(false)}
-              pinnedShellRef={bannerPinnedShellRef}
-              slotRef={bannerSlotRef}
+          {isHomeView ? (
+            <>
+              {isNotificationBannerActive ? (
+                <NotificationBannerRegion
+                  anchorRef={bannerAnchorRef}
+                  bannerPinned={bannerPinned}
+                  onClose={() => setNotificationBannerVisible(false)}
+                  pinnedShellRef={bannerPinnedShellRef}
+                  slotRef={bannerSlotRef}
+                />
+              ) : null}
+              <WelcomeSearch />
+              {!isEmptyHomepage || hasAddedWidgets ? (
+                <DashboardGrid
+                  addedWidgetIds={addedWidgetIds}
+                  addedWidgetRef={addedWidgetRef}
+                  getCustomWidgetById={getWidgetById}
+                  hiddenMetricCardLabels={hiddenMetricCardLabels}
+                  highlightedWidgetRefId={highlightedWidgetRefId}
+                  isAiGenerated={isAiGenerated}
+                  removedWidgetIds={removedWidgetIds}
+                  revenueProgressAdded={revenueProgressAdded}
+                  startWithEmptyHomepage={isEmptyHomepage}
+                  widgetOrder={widgetOrder}
+                />
+              ) : (
+                <HomepageEmptyState />
+              )}
+            </>
+          ) : null}
+          {homepageView === "manage-hub" ? (
+            <ManageTemplatesHubPage
+              customWidgetSummary={customWidgetSummary}
+              onGoHome={handleGoHome}
+              onOpenCustomWidgets={handleOpenManageCustomWidgets}
             />
           ) : null}
-          <WelcomeSearch />
-          <DashboardGrid addedWidgetRef={addedWidgetRef} revenueProgressAdded={revenueProgressAdded} />
+          {homepageView === "manage-custom-widgets" ? (
+            <ManageCustomWidgetsPage
+              activeTab={manageWidgetsTab}
+              draftWidgets={draftWidgets}
+              historyEntries={historyEntries}
+              onAddToHomepage={handleAddPublishedWidgetToHomepage}
+              onClearHistory={clearHistory}
+              onCreateWidget={handleCreateCustomWidget}
+              onCreateWithAi={handleOpenAiChatFromManageWidgets}
+              onDeleteWidget={handleDeleteCustomWidgetFromList}
+              onEditWidget={handleEditCustomWidget}
+              onGoHome={handleGoHome}
+              onGoHub={() => setHomepageView("manage-hub")}
+              onTabChange={setManageWidgetsTab}
+              publishedWidgets={publishedWidgets}
+              widgets={widgets}
+            />
+          ) : null}
         </div>
+        {isEditorOpen ? (
+          <CustomWidgetEditor
+            initialDraft={
+              aiSuggestedWidgetDraft ??
+              customWidgetEditorCapture?.draft ??
+              (editingWidget
+                ? {
+                    name: editingWidget.name,
+                    description: editingWidget.description,
+                    type: editingWidget.type,
+                    content: editingWidget.content,
+                    size: editingWidget.size,
+                    supportedSizes: editingWidget.supportedSizes,
+                    labelAsExternalContent: editingWidget.labelAsExternalContent,
+                    displayWidgetName: editingWidget.displayWidgetName,
+                    embedAuthenticationMode: editingWidget.embedAuthenticationMode,
+                    embedAuthenticationType: editingWidget.embedAuthenticationType,
+                    embedCredentials: editingWidget.embedCredentials,
+                    dataBinding: editingWidget.dataBinding,
+                    status: editingWidget.status,
+                  }
+                : createNewWidgetDraft())
+            }
+            initialStep={aiSuggestedEditorStep ?? customWidgetEditorCapture?.step}
+            isEditing={Boolean(editingWidgetId)}
+            widgetId={editingWidgetId}
+            onAddToHomepage={
+              editingWidget?.status === "published" && editingWidgetId
+                ? () => handleAddPublishedWidgetToHomepage(editingWidgetId)
+                : undefined
+            }
+            onClose={handleCloseCustomWidgetEditor}
+            onDelete={handleDeleteCustomWidget}
+            onPublish={handlePublishCustomWidget}
+            onSave={handleSaveCustomWidget}
+            onUnpublish={handleUnpublishCustomWidget}
+          />
+        ) : null}
+        {isTemplateEditorOpen && aiSuggestedTemplateDraft ? (
+          <HomepageTemplateEditor
+            initialDraft={aiSuggestedTemplateDraft}
+            initialStep="configure"
+            onClose={handleCloseTemplateEditor}
+            onPublish={handlePublishTemplateDraft}
+            onSave={handleSaveTemplateDraft}
+          />
+        ) : null}
         </main>
-        <AiChatPanel onClose={() => setAiChatOpen(false)} open={aiChatOpen} />
+        <AiChatPanel
+          isThinking={isThinking}
+          messages={messages}
+          onAddProposedCustomWidgetToHomepage={handleChatAddProposedCustomWidgetToHomepage}
+          onAddRecommendedWidgets={handleChatAddRecommendedWidgets}
+          onApplyCleanup={handleChatApplyCleanup}
+          onApplyPreview={handleApplyPreview}
+          onClose={closeChat}
+          onCreateProposedTeamTemplate={handleChatCreateProposedTeamTemplate}
+          onCreateWithLiveData={handleChatCreateWithLiveData}
+          onNewChat={handleNewChat}
+          onRegeneratePreview={handleRegeneratePreview}
+          onSendMessage={handleSendMessage}
+          onSuggestedAction={handleSuggestedAction}
+          onUndoCleanup={handleChatUndoCleanup}
+          onUndoPreview={handleUndoPreview}
+          open={aiChatOpen}
+          suggestionContext={suggestionContext}
+          suggestions={suggestions}
+          thinkingProcess={thinkingProcess}
+        />
       </div>
-      {!aiChatOpen ? <AiChatBadge onClick={() => setAiChatOpen(true)} /> : null}
+      {!aiChatOpen ? <AiChatBadge onClick={openChat} /> : null}
     </div>
   );
 }
