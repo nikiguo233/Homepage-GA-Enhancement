@@ -4,10 +4,10 @@ import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import Switch from "@mui/material/Switch";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CUSTOM_WIDGET_HTML, DEFAULT_EMBED_URL } from "../../customWidgets/defaultTemplate";
 import { validateEmbedUrl } from "../../customWidgets/embedPolicy";
+import { ENABLE_LABEL_AS_EXTERNAL_CONTENT } from "../../customWidgets/featureFlags";
 import { createDefaultEmbedConfig, isEmbedConfigValid, normalizeEmbedConfig } from "../../customWidgets/embedConfig";
 import {
   getWidgetDataBindingQuerySummary,
@@ -30,7 +30,9 @@ import {
   sortWidgetSizes,
 } from "../../customWidgets/widgetSizes";
 import type { CustomWidgetDraft, CustomWidgetSize, CustomWidgetType } from "../../customWidgets/types";
+import { CUSTOM_WIDGET_ACCESS_OPTIONS, normalizeCustomWidgetAccess } from "../../customWidgets/widgetAccess";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
+import { WidgetEditorPreviewGrid } from "./WidgetEditorPreviewGrid";
 import { EmbedWidgetConfigPanel } from "./EmbedWidgetConfigPanel";
 import { CustomWidgetCodeEditor } from "./CustomWidgetCodeEditor";
 import { EditorMoreMenu } from "./HomepageActionsMenu";
@@ -65,7 +67,7 @@ export function CustomWidgetEditor({
   initialDraft: CustomWidgetDraft;
   initialStep?: EditorStep;
   isEditing: boolean;
-  onAddToHomepage?: () => void;
+  onAddToHomepage?: (draft: CustomWidgetDraft) => void;
   onClose: () => void;
   onDelete?: () => void;
   onPublish: (draft: CustomWidgetDraft) => void;
@@ -76,6 +78,7 @@ export function CustomWidgetEditor({
   const [step, setStep] = useState<EditorStep>(initialStep);
   const [draft, setDraft] = useState<CustomWidgetDraft>(() => ({
     ...initialDraft,
+    access: normalizeCustomWidgetAccess(initialDraft.access),
     ...normalizeEmbedConfig(initialDraft),
   }));
   const [showCode, setShowCode] = useState(true);
@@ -92,6 +95,7 @@ export function CustomWidgetEditor({
   useEffect(() => {
     setDraft({
       ...initialDraft,
+      access: normalizeCustomWidgetAccess(initialDraft.access),
       ...normalizeEmbedConfig(initialDraft),
     });
     setStep(initialStep);
@@ -117,6 +121,12 @@ export function CustomWidgetEditor({
   const showEmbedPreview =
     draft.type === "embed" && Boolean(embedValidation?.valid) && draft.supportedSizes.length > 0;
   const isPublished = draft.status === "published";
+  const isTenantAccess = draft.access === "tenant";
+  const showPublishButton = isTenantAccess;
+  const showAddToHomepageButton =
+    Boolean(onAddToHomepage) &&
+    ((step === "configure" && !isPublished && !isTenantAccess) ||
+      (isPublished && isTenantAccess));
   const customSupportedSize = getCustomSupportedSize(draft.supportedSizes);
   const isCustomSizeEnabled = Boolean(customSupportedSize);
   const customSizeDimensions = customSupportedSize
@@ -190,12 +200,24 @@ export function CustomWidgetEditor({
   };
 
   const handlePrimaryAction = () => {
+    if (!isTenantAccess) {
+      return;
+    }
+
     if (isPublished) {
       setShowUnpublishModal(true);
       return;
     }
 
     setShowPublishModal(true);
+  };
+
+  const handleAddToHomepageClick = () => {
+    if (!canAccessConfigure || !onAddToHomepage) {
+      return;
+    }
+
+    onAddToHomepage(draft);
   };
 
   const handleCopyCode = async () => {
@@ -382,23 +404,27 @@ export function CustomWidgetEditor({
             >
               Save
             </button>
-          ) : onAddToHomepage ? (
+          ) : null}
+          {showAddToHomepageButton ? (
             <button
               className="custom-widget-editor-secondary-button"
-              onClick={onAddToHomepage}
+              disabled={!canAccessConfigure}
+              onClick={handleAddToHomepageClick}
               type="button"
             >
               Add to Homepage
             </button>
           ) : null}
-          <button
-            className="custom-widget-editor-primary-button"
-            disabled={!canPublish}
-            onClick={handlePrimaryAction}
-            type="button"
-          >
-            {isPublished ? "Unpublish" : "Publish"}
-          </button>
+          {showPublishButton ? (
+            <button
+              className="custom-widget-editor-primary-button"
+              disabled={!canPublish}
+              onClick={handlePrimaryAction}
+              type="button"
+            >
+              {isPublished ? "Unpublish" : "Publish"}
+            </button>
+          ) : null}
           <div className="custom-widget-editor-more">
             <button
               aria-label="More actions"
@@ -428,35 +454,10 @@ export function CustomWidgetEditor({
       {step === "basic" ? (
         <div className="custom-widget-editor-basic">
           <div className="custom-widget-basic-form">
-            <label className="custom-widget-field">
-              <span className="custom-widget-field-label">
-                Widget Name <span className="custom-widget-required">*</span>
-              </span>
-              <input
-                disabled={isPublished}
-                onChange={(event) => updateDraft({ name: event.target.value })}
-                placeholder="Input name"
-                value={draft.name}
-              />
-            </label>
-            <label className="custom-widget-field">
-              <span className="custom-widget-field-label">
-                Description <span className="custom-widget-required">*</span>
-              </span>
-              <textarea
-                disabled={isPublished}
-                maxLength={MAX_DESCRIPTION_LENGTH}
-                onChange={(event) => updateDraft({ description: event.target.value })}
-                placeholder="Input description of the widget"
-                rows={4}
-                value={draft.description}
-              />
-              <span className="custom-widget-field-hint">
-                Maximum {MAX_DESCRIPTION_LENGTH} characters
-              </span>
-            </label>
             <div className="custom-widget-field">
-              <span className="custom-widget-field-label">Select Type</span>
+              <span className="custom-widget-field-label">
+                Type <span className="custom-widget-required">*</span>
+              </span>
               <div className="custom-widget-type-grid">
                 <button
                   className={`custom-widget-type-card${draft.type === "html" ? " is-selected" : ""}`}
@@ -488,7 +489,34 @@ export function CustomWidgetEditor({
                 </button>
               </div>
             </div>
-            {draft.type === "embed" ? (
+            <label className="custom-widget-field">
+              <span className="custom-widget-field-label">
+                Widget Name <span className="custom-widget-required">*</span>
+              </span>
+              <input
+                disabled={isPublished}
+                onChange={(event) => updateDraft({ name: event.target.value })}
+                placeholder="Input name"
+                value={draft.name}
+              />
+            </label>
+            <label className="custom-widget-field">
+              <span className="custom-widget-field-label">
+                Description <span className="custom-widget-required">*</span>
+              </span>
+              <textarea
+                disabled={isPublished}
+                maxLength={MAX_DESCRIPTION_LENGTH}
+                onChange={(event) => updateDraft({ description: event.target.value })}
+                placeholder="Input description of the widget"
+                rows={4}
+                value={draft.description}
+              />
+              <span className="custom-widget-field-hint">
+                Maximum {MAX_DESCRIPTION_LENGTH} characters
+              </span>
+            </label>
+            {ENABLE_LABEL_AS_EXTERNAL_CONTENT && draft.type === "embed" ? (
               <label className="custom-widget-checkbox-field">
                 <input
                   checked={draft.labelAsExternalContent}
@@ -499,6 +527,26 @@ export function CustomWidgetEditor({
                 <span>Label as External Content</span>
               </label>
             ) : null}
+            <label className="custom-widget-field">
+              <span className="custom-widget-field-label">
+                Access <span className="custom-widget-required">*</span>
+              </span>
+              <select
+                disabled={isPublished}
+                onChange={(event) =>
+                  updateDraft({
+                    access: event.target.value as CustomWidgetDraft["access"],
+                  })
+                }
+                value={draft.access}
+              >
+                {CUSTOM_WIDGET_ACCESS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="custom-widget-basic-actions">
               <button
                 className="custom-widget-primary-button"
@@ -529,20 +577,9 @@ export function CustomWidgetEditor({
                   : "Show Code"}
             </button>
             <div className="custom-widget-configure-header-controls">
-              <label className="custom-widget-display-name-toggle">
-                <span>Display Widget Name</span>
-                <Switch
-                  checked={draft.displayWidgetName}
-                  className="custom-widget-display-name-switch"
-                  disabled={isPublished}
-                  onChange={(event) => updateDraft({ displayWidgetName: event.target.checked })}
-                  size="small"
-                />
-              </label>
-              <span aria-hidden="true" className="custom-widget-configure-divider" />
               <div className="custom-widget-supported-sizes-field">
               <span className="custom-widget-supported-sizes-label">
-                Widget Size <span className="custom-widget-required">*</span>
+                Supported Widget Sizes <span className="custom-widget-required">*</span>
               </span>
               <div
                 aria-label="Supported widget sizes"
@@ -642,6 +679,7 @@ export function CustomWidgetEditor({
                       authenticationMode={embedConfig.embedAuthenticationMode}
                       authenticationType={embedConfig.embedAuthenticationType}
                       credentials={embedConfig.embedCredentials}
+                      embedSource={embedConfig.embedSource}
                       embedUrl={draft.content}
                       embedValidation={embedValidation}
                       isReadOnly={isPublished}
@@ -659,6 +697,7 @@ export function CustomWidgetEditor({
                           },
                         })
                       }
+                      onEmbedSourceChange={(embedSource) => updateDraft({ embedSource })}
                       onEmbedUrlChange={(content) => updateDraft({ content })}
                     />
                   )}
@@ -702,11 +741,7 @@ export function CustomWidgetEditor({
                 ) : draft.type === "embed" && !showEmbedPreview ? (
                   <p className="custom-widget-preview-empty-message">No Preview</p>
                 ) : (
-                  <CustomWidgetPreviewFrame
-                    interactive
-                    size={previewWidget.size}
-                    widget={previewWidget}
-                  />
+                  <WidgetEditorPreviewGrid previewWidget={previewWidget} size={previewWidget.size} />
                 )}
               </div>
             </div>

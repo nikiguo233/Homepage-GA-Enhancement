@@ -24,6 +24,7 @@ import { ENABLE_CUSTOM_WIDGET_HISTORY_TAB } from "../../customWidgets/featureFla
 import { AiButton } from "../AiButton";
 import { ManagementBreadcrumbs } from "./ManagementBreadcrumbs";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
+import { AiGeneratedChip } from "./AiGeneratedChip";
 import { DeleteConfirmModal, ClearHistoryConfirmModal } from "./CustomWidgetDashboardCard";
 
 export type ManageCustomWidgetsTab = "published" | "drafts" | "history";
@@ -170,6 +171,7 @@ export function ManageCustomWidgetsPage({
             <article className="custom-widget-grid-card" key={widget.id}>
               <div className="custom-widget-grid-preview">
                 <CustomWidgetPreviewFrame compact size={widget.size} widget={widget} />
+                {widget.isAiGenerated ? <AiGeneratedChip /> : null}
                 <div className="custom-widget-grid-card-overlay">
                   <button
                     className="custom-widget-primary-button custom-widget-grid-card-action"

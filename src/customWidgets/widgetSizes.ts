@@ -14,9 +14,12 @@ export const DEFAULT_CUSTOM_SIZE_COLS = 4;
 export const DEFAULT_CUSTOM_SIZE_ROWS = 4;
 export const MIN_WIDGET_GRID_UNIT = 1;
 export const MAX_WIDGET_GRID_UNIT = 12;
-
-const WIDGET_GRID_UNIT_WIDTH = 116;
-const WIDGET_GRID_UNIT_HEIGHT = 136;
+export const HOMEPAGE_WIDGET_GRID_COLUMNS = 6;
+export const WIDGET_GRID_GAP = 24;
+export const WIDGET_GRID_UNIT_WIDTH = 116;
+export const WIDGET_GRID_UNIT_HEIGHT = 136;
+export const WIDGET_EDITOR_PREVIEW_GRID_CELL_HEIGHT = 120;
+export const WIDGET_EDITOR_PREVIEW_GRID_ROWS = 4;
 
 const PRESET_SIZE_ORDER = new Map(PRESET_WIDGET_SIZES.map((size, index) => [size, index]));
 
@@ -145,6 +148,20 @@ export function getWidgetDesignDimensions(size: CustomWidgetSize) {
   return {
     width: cols * WIDGET_GRID_UNIT_WIDTH,
     height: rows * WIDGET_GRID_UNIT_HEIGHT,
+  };
+}
+
+export function getWidgetGridSlotDimensions(
+  size: CustomWidgetSize,
+  options?: { editorPreview?: boolean },
+) {
+  const { cols, rows } = parseWidgetSize(size);
+  const cellHeight = options?.editorPreview
+    ? WIDGET_EDITOR_PREVIEW_GRID_CELL_HEIGHT
+    : WIDGET_GRID_UNIT_HEIGHT;
+  return {
+    width: cols * WIDGET_GRID_UNIT_WIDTH + Math.max(cols - 1, 0) * WIDGET_GRID_GAP,
+    height: rows * cellHeight + Math.max(rows - 1, 0) * WIDGET_GRID_GAP,
   };
 }
 

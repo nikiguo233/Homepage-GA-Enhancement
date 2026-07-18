@@ -8,6 +8,7 @@ import type {
   CustomWidgetType,
 } from "./types";
 import { buildHistoryEntry, buildSaveHistoryEntry } from "./widgetHistory";
+import { normalizeCustomWidgetAccess } from "./widgetAccess";
 import { normalizeWidgetDataBinding } from "./widgetDataBinding";
 import { DEFAULT_SUPPORTED_WIDGET_SIZES, normalizeSupportedWidgetSizes, normalizeWidgetSize } from "./widgetSizes";
 
@@ -34,8 +35,10 @@ function loadWidgets(): CustomWidget[] {
             ...widget,
             size,
             supportedSizes: normalizeSupportedWidgetSizes(widget.supportedSizes, size),
+            access: normalizeCustomWidgetAccess(widget.access),
             labelAsExternalContent: Boolean(widget.labelAsExternalContent),
             displayWidgetName: Boolean(widget.displayWidgetName),
+            isAiGenerated: Boolean(widget.isAiGenerated),
             ...normalizeEmbedConfig(widget),
             dataBinding: normalizeWidgetDataBinding(widget),
           };
@@ -85,6 +88,7 @@ export function createEmptyCustomWidgetDraft(
     content: type === "html" ? DEFAULT_CUSTOM_WIDGET_HTML : DEFAULT_EMBED_URL,
     size: "3x3",
     supportedSizes: [...DEFAULT_SUPPORTED_WIDGET_SIZES],
+    access: "private",
     labelAsExternalContent: type === "embed",
     displayWidgetName: false,
     ...createDefaultEmbedConfig(),
@@ -142,12 +146,15 @@ export function useCustomWidgets() {
         content: draft.content,
         size: draft.size,
         supportedSizes: draft.supportedSizes,
+        access: draft.access,
         labelAsExternalContent: draft.labelAsExternalContent,
         displayWidgetName: draft.displayWidgetName,
         embedAuthenticationMode: draft.embedAuthenticationMode,
         embedAuthenticationType: draft.embedAuthenticationType,
         embedCredentials: draft.embedCredentials,
+        embedSource: draft.embedSource,
         dataBinding: draft.dataBinding,
+        isAiGenerated: draft.isAiGenerated ?? false,
         status: draft.status ?? "draft",
         createdAt: now,
         updatedAt: now,

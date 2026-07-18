@@ -3,12 +3,18 @@ import { getAvailableWidgetRecommendations } from "../homepageConfig/widgetCatal
 import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
 import type { HomepageLayout } from "../homepageConfig/types";
 import {
-  BILLING_OPS_TEAM_TEMPLATE_PROPOSAL,
+  COLLECTIONS_TEAM_TEMPLATE_PROPOSAL,
+  FINANCE_LEADERSHIP_TEAM_TEMPLATE_PROPOSAL,
+  REVENUE_CLOSE_TEAM_TEMPLATE_PROPOSAL,
   TOP_ACCOUNTS_CUSTOM_WIDGET_PROPOSAL,
 } from "./assistantProposals";
 import { getTeamTemplatePreviewWidgetIds } from "../homepageConfig/teamTemplate";
-import { HOMEPAGE_CREATION_RECOMMENDATIONS } from "./recommendationRationales";
-import type { AssistantResponse, AiChatSuggestionContext, SuggestedAction } from "./types";
+import {
+  HOMEPAGE_CREATION_RECOMMENDATIONS,
+  MONTH_END_CLOSE_DASHBOARD_RECOMMENDATIONS,
+  MONTH_END_CLOSE_LIBRARY_WIDGET_IDS,
+} from "./recommendationRationales";
+import type { AssistantResponse, AiChatSuggestionContext, SuggestedAction, TeamTemplateProposal } from "./types";
 
 export const HOMEPAGE_CONFIG_SUGGESTIONS: SuggestedAction[] = [
   {
@@ -31,12 +37,6 @@ export const HOMEPAGE_CONFIG_SUGGESTIONS: SuggestedAction[] = [
     id: "cleanup-homepage",
     label: "Clean up the homepage and remove low-value widgets",
     prompt: "Clean up the homepage and remove low-value widgets.",
-  },
-  {
-    id: "billing-ops-template",
-    label: "Create a shared Billing Ops template for my team",
-    prompt: "Create a shared Billing Ops template for my team.",
-    badge: "Admins Only",
   },
 ];
 
@@ -63,15 +63,39 @@ export const CUSTOM_WIDGET_CREATION_SUGGESTIONS: SuggestedAction[] = [
   },
 ];
 
+export const TEMPLATE_CREATION_SUGGESTIONS: SuggestedAction[] = [
+  {
+    id: "revenue-close-template",
+    label: "Create a Revenue Close template for accounting teams",
+    prompt: "Create a Revenue Close template for accounting teams.",
+  },
+  {
+    id: "finance-leadership-template",
+    label: "Create a Finance Leadership executive template",
+    prompt: "Create a Finance Leadership executive template.",
+  },
+  {
+    id: "collections-template",
+    label: "Create a Collections team homepage template",
+    prompt: "Create a Collections team homepage template.",
+  },
+];
+
 export function getSuggestionsForContext(context: AiChatSuggestionContext): SuggestedAction[] {
-  return context === "custom-widget"
-    ? CUSTOM_WIDGET_CREATION_SUGGESTIONS
-    : HOMEPAGE_CONFIG_SUGGESTIONS;
+  if (context === "custom-widget") {
+    return CUSTOM_WIDGET_CREATION_SUGGESTIONS;
+  }
+
+  if (context === "template") {
+    return TEMPLATE_CREATION_SUGGESTIONS;
+  }
+
+  return HOMEPAGE_CONFIG_SUGGESTIONS;
 }
 
 const HOMEPAGE_CREATED_RESPONSE: AssistantResponse = {
   message:
-    "Here's your homepage! It includes 4 quick-action metric cards and a revenue trend chart. I've noted why each one fits your role below.",
+    "Here's your homepage! I selected a revenue trend chart from your widget library and generated 4 quick-action metric cards tailored to your role. I've noted the source of each widget below.",
   preview: {
     kind: "ai-generated-homepage",
   },
@@ -79,13 +103,36 @@ const HOMEPAGE_CREATED_RESPONSE: AssistantResponse = {
   showFeedback: true,
 };
 
+const MONTH_END_CLOSE_DASHBOARD_RESPONSE: AssistantResponse = {
+  message:
+    "Here's your month-end close dashboard! I generated KPI cards for close tracking and pulled in Close Process Status, Revenue Tasks, and Zuora Revenue Report from your widget library. I've noted the source of each widget below.",
+  preview: {
+    kind: "ai-generated-homepage",
+    libraryWidgetIds: MONTH_END_CLOSE_LIBRARY_WIDGET_IDS,
+    variant: "month-end-close",
+  },
+  recommendations: MONTH_END_CLOSE_DASHBOARD_RECOMMENDATIONS,
+  showFeedback: true,
+};
+
+function isMonthEndCloseDashboardPrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return (
+    normalized.includes("month-end close") ||
+    normalized.includes("month end close") ||
+    (normalized.includes("close dashboard") && normalized.includes("build"))
+  );
+}
+
 function isHomepageCreationPrompt(text: string) {
   const normalized = text.trim().toLowerCase();
 
   return (
     normalized.includes("create a homepage") ||
     normalized.includes("quick action") ||
-    normalized.includes("data overview")
+    normalized.includes("data overview") ||
+    normalized.includes("daily work")
   );
 }
 
@@ -119,14 +166,37 @@ function isTopAccountsTablePrompt(text: string) {
   );
 }
 
-function isBillingOpsTemplatePrompt(text: string) {
+function isRevenueCloseTemplatePrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return normalized.includes("revenue close") && normalized.includes("template");
+}
+
+function isFinanceLeadershipTemplatePrompt(text: string) {
   const normalized = text.trim().toLowerCase();
 
   return (
-    (normalized.includes("billing ops") && normalized.includes("template")) ||
-    (normalized.includes("shared") && normalized.includes("billing") && normalized.includes("template")) ||
-    (normalized.includes("template") && normalized.includes("for my team") && normalized.includes("billing"))
+    (normalized.includes("finance leadership") || normalized.includes("executive")) &&
+    normalized.includes("template")
   );
+}
+
+function isCollectionsTemplatePrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return normalized.includes("collections") && normalized.includes("template");
+}
+
+function buildTeamTemplateResponse(proposal: TeamTemplateProposal) {
+  return {
+    teamTemplateProposal: proposal,
+    preview: {
+      kind: "team-template" as const,
+      widgetIds: getTeamTemplatePreviewWidgetIds(proposal),
+    },
+    message: `I drafted a shared ${proposal.name} template for your team. Review the layout preview below, then create the template to publish it for your team.`,
+    showFeedback: false,
+  };
 }
 
 export function getHomepageConfigAssistantResponse(
@@ -188,7 +258,7 @@ export function getHomepageConfigAssistantResponse(
 
     return {
       message:
-        "Based on your homepage, here are widgets I recommend adding. Each includes a short note on why it may help.",
+        "Based on your homepage, here are widgets I recommend adding — some from your widget library and some I can generate for you. Each includes a short note on why it may help.",
       showFeedback: false,
       widgetRecommendations: recommendations,
     };
@@ -203,20 +273,19 @@ export function getHomepageConfigAssistantResponse(
     };
   }
 
-  if (isBillingOpsTemplatePrompt(prompt)) {
-    return {
-      teamTemplateProposal: BILLING_OPS_TEAM_TEMPLATE_PROPOSAL,
-      preview: {
-        kind: "team-template",
-        widgetIds: getTeamTemplatePreviewWidgetIds(BILLING_OPS_TEAM_TEMPLATE_PROPOSAL),
-      },
-      message:
-        "I drafted a shared Billing Ops template for your team. It bundles the widgets billing operations teams use most, including an open-balance leaderboard. Review the layout preview below, then create the template to publish it for your team.",
-      showFeedback: false,
-    };
+  if (isRevenueCloseTemplatePrompt(prompt)) {
+    return buildTeamTemplateResponse(REVENUE_CLOSE_TEAM_TEMPLATE_PROPOSAL);
   }
 
-  if (isHomepageCreationPrompt(prompt)) {
+  if (isFinanceLeadershipTemplatePrompt(prompt)) {
+    return buildTeamTemplateResponse(FINANCE_LEADERSHIP_TEAM_TEMPLATE_PROPOSAL);
+  }
+
+  if (isCollectionsTemplatePrompt(prompt)) {
+    return buildTeamTemplateResponse(COLLECTIONS_TEAM_TEMPLATE_PROPOSAL);
+  }
+
+  if (isHomepageCreationPrompt(prompt) || isMonthEndCloseDashboardPrompt(prompt)) {
     if (options.isAiGenerated) {
       return {
         message:
@@ -225,7 +294,9 @@ export function getHomepageConfigAssistantResponse(
       };
     }
 
-    return HOMEPAGE_CREATED_RESPONSE;
+    return isMonthEndCloseDashboardPrompt(prompt)
+      ? MONTH_END_CLOSE_DASHBOARD_RESPONSE
+      : HOMEPAGE_CREATED_RESPONSE;
   }
 
   if (prompt.toLowerCase().includes("navigation bar")) {

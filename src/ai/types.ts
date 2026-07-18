@@ -1,5 +1,8 @@
+import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
 import type { HomepageCleanupPlan } from "../homepageConfig/homepageCleanup";
 import type { CustomWidgetDraft, WidgetDataBinding } from "../customWidgets/types";
+
+export type AiGeneratedDashboardVariant = "default" | "month-end-close";
 
 export type { HomepageCleanupPlan };
 
@@ -10,20 +13,25 @@ export type SuggestedAction = {
   badge?: string;
 };
 
-export type AiChatSuggestionContext = "homepage" | "custom-widget";
+export type AiChatSuggestionContext = "homepage" | "custom-widget" | "template";
 
 export type ChatPreview =
   | {
       kind: "ai-generated-homepage";
+      libraryWidgetIds?: DashboardWidgetId[];
+      variant?: AiGeneratedDashboardVariant;
     }
   | {
       kind: "team-template";
       widgetIds: string[];
     };
 
+export type WidgetRecommendationSource = "library" | "ai-generated";
+
 export type AiRecommendation = {
   name: string;
   reason: string;
+  source?: WidgetRecommendationSource;
 };
 
 export type RecommendedWidget = {
@@ -31,6 +39,7 @@ export type RecommendedWidget = {
   name: string;
   description: string;
   reason: string;
+  source: WidgetRecommendationSource;
 };
 
 export type CustomWidgetProposal = {
@@ -76,11 +85,11 @@ export type ChatMessage = {
   cleanupProposal?: HomepageCleanupPlan;
   cleanupApplied?: boolean;
   customWidgetProposal?: CustomWidgetProposal;
-  liveDataWidgetAdded?: boolean;
-  liveDataWidgetCreated?: boolean;
+  customWidgetSaved?: boolean;
   proposedCustomWidgetId?: string;
   teamTemplateProposal?: TeamTemplateProposal;
-  teamTemplateCreated?: boolean;
+  teamTemplateSaved?: boolean;
+  proposedTemplateId?: string;
 };
 
 export type AssistantResponse = {

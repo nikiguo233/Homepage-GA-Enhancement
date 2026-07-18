@@ -47,10 +47,11 @@ import {
 import { flushSync } from "react-dom";
 import configureHomepageIconUrl from "./assets/configure-homepage.svg";
 import { buildTopAccountsLiveDataProposal } from "./ai/assistantProposals";
+import { AI_RECOMMENDATION_TOP_ACCOUNTS_ID } from "./ai/recommendationRationales";
 import { useAiHomepageConfigChat } from "./ai/useAiHomepageConfigChat";
-import type { CustomWidgetProposal, TeamTemplateProposal } from "./ai/types";
+import type { ChatPreview, CustomWidgetProposal, TeamTemplateProposal } from "./ai/types";
 import { HomepageTemplateEditor } from "./components/HomepageTemplateEditor";
-import { createTemplateDraftFromProposal } from "./homepageConfig/teamTemplate";
+import { createTemplateDraftFromProposal, createTemplateId } from "./homepageConfig/teamTemplate";
 import type { HomepageTemplateDraft } from "./homepageConfig/teamTemplate";
 import { AiChatBadge, AiChatPanel } from "./AiChatPanel";
 import { AiGeneratedDashboard } from "./components/AiGeneratedDashboard";
@@ -70,7 +71,13 @@ import { WidgetDrawerShell } from "./components/customWidgets/WidgetDrawerShell"
 import { WidgetSizePreview } from "./components/customWidgets/WidgetSizePreview";
 import { HomepageActionsMenu } from "./components/customWidgets/HomepageActionsMenu";
 import { ManageCustomWidgetsPage } from "./components/customWidgets/ManageCustomWidgetsPage";
+import { AiGeneratedWidgetDetailModal } from "./components/customWidgets/AiGeneratedWidgetDetailModal";
 import { ManageTemplatesHubPage } from "./components/customWidgets/ManageTemplatesHubPage";
+import {
+  ManageTemplatesPage,
+  type ManageTemplatesTab,
+} from "./components/customWidgets/ManageTemplatesPage";
+import { useHomepageTemplates } from "./homepageConfig/useHomepageTemplates";
 import { createCustomWidgetRefId } from "./customWidgets/types";
 import type { CustomWidget, CustomWidgetDraft, CustomWidgetSize } from "./customWidgets/types";
 import { useCustomWidgets } from "./customWidgets/useCustomWidgets";
@@ -123,6 +130,7 @@ type WidgetDrawerConfigureEntry = "select" | "direct";
 type HomepageView =
   | "home"
   | "manage-hub"
+  | "manage-templates"
   | "manage-custom-widgets"
   | "create-widget"
   | "edit-widget"
@@ -1491,12 +1499,16 @@ function NotificationBanner({
 function FeedbackToast({
   message,
   onClose,
+  onViewDetails,
   onViewWidget,
+  showViewDetails,
   showViewWidget,
 }: {
   message: string;
   onClose: () => void;
+  onViewDetails?: () => void;
   onViewWidget?: () => void;
+  showViewDetails?: boolean;
   showViewWidget?: boolean;
 }) {
   return (
@@ -1507,6 +1519,11 @@ function FeedbackToast({
           <p>{message}</p>
         </div>
         <div className="feedback-toast-actions">
+          {showViewDetails && onViewDetails ? (
+            <button className="feedback-toast-action" type="button" onClick={onViewDetails}>
+              View Details
+            </button>
+          ) : null}
           {showViewWidget && onViewWidget ? (
             <button className="feedback-toast-action" type="button" onClick={onViewWidget}>
               view Widget
@@ -1524,6 +1541,8 @@ function FeedbackToast({
 function DashboardGrid({
   addedWidgetIds,
   addedWidgetRef,
+  aiDashboardVariant,
+  aiLibraryWidgetIds,
   getCustomWidgetById,
   hiddenMetricCardLabels,
   highlightedWidgetRefId,
@@ -1535,6 +1554,8 @@ function DashboardGrid({
 }: {
   addedWidgetIds: string[];
   addedWidgetRef: RefObject<HTMLElement | null>;
+  aiDashboardVariant: "default" | "month-end-close";
+  aiLibraryWidgetIds: DashboardWidgetId[];
   getCustomWidgetById: (widgetId: string) => CustomWidget | undefined;
   hiddenMetricCardLabels: string[];
   highlightedWidgetRefId: string | null;
@@ -1552,6 +1573,8 @@ function DashboardGrid({
           getCustomWidgetById={getCustomWidgetById}
           hiddenMetricCardLabels={hiddenMetricCardLabels}
           highlightedWidgetRefId={highlightedWidgetRefId}
+          libraryWidgetIds={aiLibraryWidgetIds}
+          variant={aiDashboardVariant}
           widgetRef={addedWidgetRef}
         />
       </section>
@@ -1588,6 +1611,8 @@ function DashboardGrid({
 
 type FeedbackToastState = {
   message: string;
+  savedCustomWidgetId?: string;
+  savedTemplateId?: string;
   showViewWidgetAction?: boolean;
 };
 
@@ -1603,6 +1628,8 @@ export function App() {
   const {
     addWidgets,
     addedWidgetIds,
+    aiDashboardVariant,
+    aiLibraryWidgetIds,
     applyAiGeneratedLayout,
     applyCleanupPlan,
     hiddenMetricCardLabels,
@@ -1623,38 +1650,92 @@ export function App() {
     saveWidget,
     widgets,
   } = useCustomWidgets();
+  const {
+    createTemplate,
+    deleteTemplate,
+    draftTemplates,
+    getTemplateById,
+    publishTemplate,
+    publishedTemplates,
+    saveTemplate,
+    templates,
+  } = useHomepageTemplates();
   const [homepageView, setHomepageView] = useState<HomepageView>(() =>
     customWidgetEditorCapture ? "create-widget" : "home",
   );
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+  const [viewingAiGeneratedWidgetId, setViewingAiGeneratedWidgetId] = useState<string | null>(null);
   const [aiSuggestedWidgetDraft, setAiSuggestedWidgetDraft] = useState<CustomWidgetDraft | null>(null);
   const [aiSuggestedEditorStep, setAiSuggestedEditorStep] = useState<EditorStep | null>(null);
   const [aiSuggestedTemplateDraft, setAiSuggestedTemplateDraft] =
     useState<HomepageTemplateDraft | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateEditorReturnView, setTemplateEditorReturnView] =
+    useState<Extract<HomepageView, "home" | "manage-templates">>("home");
   const [manageWidgetsTab, setManageWidgetsTab] = useState<ManageWidgetsTab>("published");
+  const [manageTemplatesTab, setManageTemplatesTab] = useState<ManageTemplatesTab>("published");
   const [homepageMenuOpen, setHomepageMenuOpen] = useState(false);
   const configureActionsRef = useRef<HTMLDivElement | null>(null);
   const cleanupRevenueProgressSnapshot = useRef(false);
-  const showFeedbackToast = useCallback((message: string, options?: { showViewWidgetAction?: boolean }) => {
-    setFeedbackToast({
-      message,
-      showViewWidgetAction: options?.showViewWidgetAction,
-    });
-  }, []);
+  const showFeedbackToast = useCallback(
+    (
+      message: string,
+      options?: {
+        savedCustomWidgetId?: string;
+        savedTemplateId?: string;
+        showViewWidgetAction?: boolean;
+      },
+    ) => {
+      setFeedbackToast({
+        message,
+        savedCustomWidgetId: options?.savedCustomWidgetId,
+        savedTemplateId: options?.savedTemplateId,
+        showViewWidgetAction: options?.showViewWidgetAction,
+      });
+    },
+    [],
+  );
   const dismissFeedbackToast = useCallback(() => {
     setFeedbackToast(null);
   }, []);
   const handleAddRecommendedWidgets = useCallback(
     (widgetIds: string[]) => {
-      addWidgets(widgetIds);
+      const dashboardWidgetIds: string[] = [];
 
-      if (!isAiGenerated && widgetIds.includes("revenue-progress")) {
+      widgetIds.forEach((widgetId) => {
+        if (widgetId === AI_RECOMMENDATION_TOP_ACCOUNTS_ID) {
+          const liveProposal = buildTopAccountsLiveDataProposal();
+          const savedWidgetId = saveWidget({
+            ...liveProposal.draft,
+            status: "draft",
+            isAiGenerated: true,
+          });
+          const refId = createCustomWidgetRefId(savedWidgetId, liveProposal.draft.size);
+          addWidgets([refId]);
+          setHighlightedWidgetRefId(refId);
+          showFeedbackToast(
+            `${liveProposal.draft.name?.trim() || "Custom widget"} has been added to your homepage and saved to your widget library.`,
+            { savedCustomWidgetId: savedWidgetId, showViewWidgetAction: true },
+          );
+          return;
+        }
+
+        dashboardWidgetIds.push(widgetId);
+      });
+
+      if (dashboardWidgetIds.length === 0) {
+        return;
+      }
+
+      addWidgets(dashboardWidgetIds);
+
+      if (!isAiGenerated && dashboardWidgetIds.includes("revenue-progress")) {
         setRevenueProgressAdded(true);
         setHighlightedWidgetRefId("revenue-progress");
         showFeedbackToast("Revenue Progress has been added.", { showViewWidgetAction: true });
       }
     },
-    [addWidgets, isAiGenerated, showFeedbackToast],
+    [addWidgets, isAiGenerated, saveWidget, showFeedbackToast],
   );
   const handleApplyCleanup = useCallback(
     (plan: HomepageCleanupPlan) => {
@@ -1671,72 +1752,113 @@ export function App() {
     undoCleanup();
     setRevenueProgressAdded(cleanupRevenueProgressSnapshot.current);
   }, [undoCleanup]);
-  const handleCreateProposedCustomWidget = useCallback(
-    (proposal: CustomWidgetProposal, widgetId?: string) => {
-      const liveProposal = buildTopAccountsLiveDataProposal();
-
-      if (widgetId) {
-        setEditingWidgetId(widgetId);
-        setAiSuggestedWidgetDraft(null);
-      } else {
-        setAiSuggestedWidgetDraft(proposal.draft ?? liveProposal.draft);
-        setEditingWidgetId(null);
-      }
-
-      setAiSuggestedEditorStep("configure");
-      setShowOnboarding(false);
-      setHomepageView("create-widget");
-    },
-    [],
-  );
-  const handleAddProposedCustomWidgetToHomepage = useCallback(
+  const handleSaveProposedCustomWidget = useCallback(
     (proposal: CustomWidgetProposal) => {
       if (!proposal.supportsLiveData) {
         return undefined;
       }
 
       const liveProposal = buildTopAccountsLiveDataProposal();
-      const widgetId = saveWidget({ ...liveProposal.draft, status: "published" });
+      const widgetId = saveWidget({
+        ...liveProposal.draft,
+        status: "draft",
+        isAiGenerated: true,
+      });
       const refId = createCustomWidgetRefId(widgetId, liveProposal.draft.size);
-
       addWidgets([refId]);
       setHighlightedWidgetRefId(refId);
-      setShowOnboarding(false);
-      setHomepageView("home");
-      showFeedbackToast(`${liveProposal.draft.name?.trim() || "Custom widget"} has been added.`, {
-        showViewWidgetAction: true,
+      const widgetName = liveProposal.draft.name?.trim() || "Custom widget";
+
+      showFeedbackToast(`${widgetName} has been added to your homepage and saved to your widget library.`, {
+        savedCustomWidgetId: widgetId,
       });
 
       return widgetId;
     },
     [addWidgets, saveWidget, showFeedbackToast],
   );
-  const handleCreateProposedTeamTemplate = useCallback(
-    (proposal: TeamTemplateProposal) => {
-      setAiSuggestedTemplateDraft(createTemplateDraftFromProposal(proposal));
+  const handleOpenSavedCustomWidget = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+      dismissFeedbackToast();
       setShowOnboarding(false);
-      setHomepageView("edit-template");
+
+      if (widget?.isAiGenerated) {
+        setViewingAiGeneratedWidgetId(widgetId);
+        setManageWidgetsTab("drafts");
+        return;
+      }
+
+      setEditingWidgetId(widgetId);
+      setAiSuggestedWidgetDraft(null);
+      setAiSuggestedEditorStep("configure");
+      setManageWidgetsTab("drafts");
+      setHomepageView("edit-widget");
     },
-    [],
+    [dismissFeedbackToast, getWidgetById],
+  );
+  const handleSaveProposedTeamTemplate = useCallback(
+    (proposal: TeamTemplateProposal) => {
+      const draft = {
+        ...createTemplateDraftFromProposal(proposal),
+        id: createTemplateId(),
+      };
+      const templateId = saveTemplate(draft);
+      const templateName = draft.name?.trim() || "Template";
+
+      showFeedbackToast(`${templateName} has been saved.`, { savedTemplateId: templateId });
+
+      return templateId;
+    },
+    [saveTemplate, showFeedbackToast],
+  );
+  const handleOpenSavedTemplate = useCallback(
+    (templateId: string) => {
+      setEditingTemplateId(templateId);
+      setAiSuggestedTemplateDraft(null);
+      setShowOnboarding(false);
+      setManageTemplatesTab("drafts");
+      setHomepageView("edit-template");
+      dismissFeedbackToast();
+    },
+    [dismissFeedbackToast],
   );
   const handleCloseTemplateEditor = useCallback(() => {
     setAiSuggestedTemplateDraft(null);
-    setHomepageView("home");
-  }, []);
+    setEditingTemplateId(null);
+    setHomepageView(templateEditorReturnView);
+  }, [templateEditorReturnView]);
   const handleSaveTemplateDraft = useCallback(
     (draft: HomepageTemplateDraft) => {
+      saveTemplate(draft);
       setAiSuggestedTemplateDraft(draft);
       showFeedbackToast(`${draft.name} template draft saved.`);
     },
-    [showFeedbackToast],
+    [saveTemplate, showFeedbackToast],
   );
   const handlePublishTemplateDraft = useCallback(
     (draft: HomepageTemplateDraft) => {
+      publishTemplate(draft);
       addWidgets([...draft.dashboardWidgetIds, ...draft.customWidgetRefs]);
       setAiSuggestedTemplateDraft({ ...draft, status: "published" });
+      setManageTemplatesTab("published");
       showFeedbackToast(`${draft.name} template published for your team.`);
     },
-    [addWidgets, showFeedbackToast],
+    [addWidgets, publishTemplate, showFeedbackToast],
+  );
+  const handleApplyAiGeneratedPreview = useCallback(
+    (preview?: ChatPreview) => {
+      if (preview?.kind === "ai-generated-homepage") {
+        applyAiGeneratedLayout({
+          libraryWidgetIds: preview.libraryWidgetIds,
+          variant: preview.variant ?? "default",
+        });
+        return;
+      }
+
+      applyAiGeneratedLayout();
+    },
+    [applyAiGeneratedLayout],
   );
   const isEmptyHomepage = startWithEmptyHomepage && !isAiGenerated;
   const {
@@ -1745,18 +1867,20 @@ export function App() {
     handleAddRecommendedWidgets: handleChatAddRecommendedWidgets,
     handleApplyCleanup: handleChatApplyCleanup,
     handleApplyPreview,
-    handleAddProposedCustomWidgetToHomepage: handleChatAddProposedCustomWidgetToHomepage,
-    handleCreateProposedTeamTemplate: handleChatCreateProposedTeamTemplate,
-    handleCreateWithLiveData: handleChatCreateWithLiveData,
+    handleSaveProposedTeamTemplate: handleChatSaveProposedTeamTemplate,
     handleNewChat,
     handleRegeneratePreview,
+    handleSaveProposedCustomWidget: handleChatSaveProposedCustomWidget,
     handleSendMessage,
     handleSuggestedAction,
     handleUndoCleanup: handleChatUndoCleanup,
     handleUndoPreview,
+    inputMessage,
     isThinking,
     messages,
+    onInputMessageChange,
     openChat,
+    showEmptyStateSuggestions,
     startChat,
     suggestionContext,
     suggestions,
@@ -1770,10 +1894,9 @@ export function App() {
     layout,
     onAddWidgets: handleAddRecommendedWidgets,
     onApplyCleanup: handleApplyCleanup,
-    onApplyPreview: applyAiGeneratedLayout,
-    onAddProposedCustomWidgetToHomepage: handleAddProposedCustomWidgetToHomepage,
-    onCreateProposedCustomWidget: handleCreateProposedCustomWidget,
-    onCreateProposedTeamTemplate: handleCreateProposedTeamTemplate,
+    onApplyPreview: handleApplyAiGeneratedPreview,
+    onSaveProposedTeamTemplate: handleSaveProposedTeamTemplate,
+    onSaveProposedCustomWidget: handleSaveProposedCustomWidget,
     onUndoCleanup: handleUndoCleanup,
     onUndoPreview: resetToDefaultLayout,
     removedWidgetIds,
@@ -1833,15 +1956,34 @@ export function App() {
     [resetToDefaultLayout],
   );
 
-  const handleCreateWithZuoraAi = useCallback(() => {
+  const beginOnboardingAiSession = useCallback(() => {
     resetToDefaultLayout();
     setRevenueProgressAdded(false);
     setNotificationBannerVisible(false);
     setStartWithEmptyHomepage(true);
     setShowOnboarding(false);
     setHomepageView("home");
+    setTemplateEditorReturnView("home");
+  }, [resetToDefaultLayout]);
+
+  const handleOnboardingOpenAiChat = useCallback(() => {
+    beginOnboardingAiSession();
     startChat({ context: "homepage", reset: true });
-  }, [resetToDefaultLayout, startChat]);
+  }, [beginOnboardingAiSession, startChat]);
+
+  const handleOnboardingAiPrompt = useCallback(
+    (prompt: string) => {
+      beginOnboardingAiSession();
+      startChat({
+        context: "homepage",
+        draftMessage: prompt,
+        reset: true,
+        showEmptyStateSuggestions: false,
+      });
+    },
+    [beginOnboardingAiSession, startChat],
+  );
+
 
   const handleOpenManageCustomWidgetsFromDrawer = useCallback(() => {
     setWidgetDrawerStep("closed");
@@ -1864,15 +2006,77 @@ export function App() {
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
 
+  const handleOpenManageTemplates = useCallback(() => {
+    setHomepageView("manage-templates");
+    scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [scrollRef]);
+
   const handleGoHome = useCallback(() => {
     setHomepageView("home");
     setEditingWidgetId(null);
+    setEditingTemplateId(null);
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
+
+  const handlePublishAiGeneratedWidget = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+
+      if (!widget || widget.status !== "draft") {
+        return;
+      }
+
+      saveWidget({ ...widget, status: "published" }, widgetId);
+      setViewingAiGeneratedWidgetId(null);
+      setManageWidgetsTab("published");
+      showFeedbackToast(`${widget.name?.trim() || "Custom widget"} published.`);
+    },
+    [getWidgetById, saveWidget, showFeedbackToast],
+  );
+
+  const handleUnpublishAiGeneratedWidget = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+
+      if (!widget || widget.status !== "published") {
+        return;
+      }
+
+      saveWidget({ ...widget, status: "draft" }, widgetId);
+      setViewingAiGeneratedWidgetId(null);
+      setManageWidgetsTab("drafts");
+      showFeedbackToast(`${widget.name?.trim() || "Custom widget"} unpublished.`);
+    },
+    [getWidgetById, saveWidget, showFeedbackToast],
+  );
+
+  const handleEditAiGeneratedWidgetWithAi = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+      const widgetName = widget?.name?.trim() || "custom widget";
+
+      setViewingAiGeneratedWidgetId(null);
+      startChat({
+        context: "custom-widget",
+        draftMessage: `Help me update the "${widgetName}" widget`,
+        reset: true,
+      });
+    },
+    [getWidgetById, startChat],
+  );
 
   const handleOpenAiChatFromManageWidgets = useCallback(() => {
     startChat({ context: "custom-widget", reset: true });
   }, [startChat]);
+
+  const handleOpenAiChatFromTemplateEditor = useCallback(() => {
+    startChat({ context: "template", reset: true });
+  }, [startChat]);
+
+  const handleOpenAiChatBadge = useCallback(() => {
+    setTemplateEditorReturnView("home");
+    openChat();
+  }, [openChat]);
 
   const handleCreateCustomWidget = useCallback(() => {
     setAiSuggestedWidgetDraft(null);
@@ -1881,10 +2085,20 @@ export function App() {
     setHomepageView("create-widget");
   }, []);
 
-  const handleEditCustomWidget = useCallback((widgetId: string) => {
-    setEditingWidgetId(widgetId);
-    setHomepageView("edit-widget");
-  }, []);
+  const handleEditCustomWidget = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+
+      if (widget?.isAiGenerated) {
+        setViewingAiGeneratedWidgetId(widgetId);
+        return;
+      }
+
+      setEditingWidgetId(widgetId);
+      setHomepageView("edit-widget");
+    },
+    [getWidgetById],
+  );
 
   const handleCloseCustomWidgetEditor = useCallback(() => {
     setHomepageView("manage-custom-widgets");
@@ -1892,6 +2106,51 @@ export function App() {
     setAiSuggestedWidgetDraft(null);
     setAiSuggestedEditorStep(null);
   }, []);
+
+  const handleCreateTemplate = useCallback(() => {
+    const templateId = createTemplate();
+    setEditingTemplateId(templateId);
+    setAiSuggestedTemplateDraft(null);
+    setManageTemplatesTab("drafts");
+    setTemplateEditorReturnView("manage-templates");
+    setHomepageView("edit-template");
+  }, [createTemplate]);
+
+  const handleEditTemplate = useCallback(
+    (templateId: string) => {
+      const template = getTemplateById(templateId);
+      if (!template) {
+        return;
+      }
+
+      setEditingTemplateId(templateId);
+      setAiSuggestedTemplateDraft(null);
+      setManageTemplatesTab(template.status === "published" ? "published" : "drafts");
+      setTemplateEditorReturnView("manage-templates");
+      setHomepageView("edit-template");
+    },
+    [getTemplateById],
+  );
+
+  const handleDeleteTemplate = useCallback(
+    (templateId: string) => {
+      deleteTemplate(templateId);
+    },
+    [deleteTemplate],
+  );
+
+  const handleAddTemplateToHomepage = useCallback(
+    (templateId: string) => {
+      const template = getTemplateById(templateId);
+      if (!template) {
+        return;
+      }
+
+      addWidgets([...template.dashboardWidgetIds, ...template.customWidgetRefs]);
+      showFeedbackToast(`${template.name} template applied to your homepage.`);
+    },
+    [addWidgets, getTemplateById, showFeedbackToast],
+  );
 
   const handleSaveCustomWidget = useCallback(
     (draft: Parameters<typeof saveWidget>[0]) => {
@@ -1975,11 +2234,15 @@ export function App() {
     [addWidgets, getWidgetById, showFeedbackToast],
   );
 
-  const handleAddPublishedWidgetToHomepage = useCallback(
+  const openCustomWidgetHomepageDrawer = useCallback(
     (widgetId: string) => {
       const widget = getWidgetById(widgetId);
 
-      if (!widget || widget.status !== "published" || widget.supportedSizes.length === 0) {
+      if (!widget || widget.supportedSizes.length === 0) {
+        return;
+      }
+
+      if (widget.access === "tenant" && widget.status !== "published") {
         return;
       }
 
@@ -1992,6 +2255,26 @@ export function App() {
       setWidgetDrawerStep("configure");
     },
     [getWidgetById],
+  );
+
+  const handleAddPublishedWidgetToHomepage = useCallback(
+    (widgetId: string) => {
+      openCustomWidgetHomepageDrawer(widgetId);
+    },
+    [openCustomWidgetHomepageDrawer],
+  );
+
+  const handleAddCustomWidgetToHomepageFromEditor = useCallback(
+    (draft: CustomWidgetDraft) => {
+      const widgetId = saveWidget(draft, editingWidgetId ?? undefined);
+
+      if (widgetId !== editingWidgetId) {
+        setEditingWidgetId(widgetId);
+      }
+
+      openCustomWidgetHomepageDrawer(widgetId);
+    },
+    [editingWidgetId, openCustomWidgetHomepageDrawer, saveWidget],
   );
 
   const handleSelectCustomWidget = useCallback(
@@ -2254,6 +2537,9 @@ export function App() {
   }, [scrollRef, showOnboarding]);
 
   const editingWidget = editingWidgetId ? getWidgetById(editingWidgetId) : undefined;
+  const viewingAiGeneratedWidget = viewingAiGeneratedWidgetId
+    ? getWidgetById(viewingAiGeneratedWidgetId)
+    : undefined;
   const configuringCustomWidget = configuringCustomWidgetId
     ? getWidgetById(configuringCustomWidgetId)
     : undefined;
@@ -2261,6 +2547,12 @@ export function App() {
     widgets.length === 0
       ? "You don't have any custom widgets yet."
       : `${publishedWidgets.length} Published, ${draftWidgets.length} Drafts`;
+  const templateSummary =
+    templates.length === 0
+      ? "You don't have any templates yet."
+      : `${publishedTemplates.length} Published, ${draftTemplates.length} Drafts`;
+  const editingTemplate = editingTemplateId ? getTemplateById(editingTemplateId) : undefined;
+  const activeTemplateDraft = aiSuggestedTemplateDraft ?? editingTemplate ?? null;
   const isHomeView = homepageView === "home";
   const isEditorOpen = homepageView === "create-widget" || homepageView === "edit-widget";
   const isTemplateEditorOpen = homepageView === "edit-template";
@@ -2275,11 +2567,17 @@ export function App() {
 
   return showOnboarding ? (
     <OnboardingScreen
-      onCreateWithAi={handleCreateWithZuoraAi}
+      onOpenAiChat={handleOnboardingOpenAiChat}
+      onSelectAiPrompt={handleOnboardingAiPrompt}
       onSelectTemplate={handleSelectOnboardingTemplate}
     />
   ) : (
-    <div className="nebula-shell" data-ai-chat-open={aiChatOpen || undefined}>
+    <div
+      className="nebula-shell"
+      data-ai-chat-open={aiChatOpen || undefined}
+      data-editor-open={isTemplateEditorOpen || isEditorOpen || undefined}
+      data-template-editor-open={isTemplateEditorOpen || undefined}
+    >
       <GlobalNav />
       <div className="homepage-workspace">
         <main
@@ -2334,7 +2632,17 @@ export function App() {
           <FeedbackToast
             message={feedbackToast.message}
             onClose={dismissFeedbackToast}
+            onViewDetails={
+              feedbackToast.savedCustomWidgetId
+                ? () => handleOpenSavedCustomWidget(feedbackToast.savedCustomWidgetId!)
+                : feedbackToast.savedTemplateId
+                  ? () => handleOpenSavedTemplate(feedbackToast.savedTemplateId!)
+                  : undefined
+            }
             onViewWidget={handleViewAddedWidget}
+            showViewDetails={Boolean(
+              feedbackToast.savedCustomWidgetId || feedbackToast.savedTemplateId,
+            )}
             showViewWidget={Boolean(feedbackToast.showViewWidgetAction && feedbackShowViewWidget)}
           />
         ) : null}
@@ -2359,6 +2667,8 @@ export function App() {
                 <DashboardGrid
                   addedWidgetIds={addedWidgetIds}
                   addedWidgetRef={addedWidgetRef}
+                  aiDashboardVariant={aiDashboardVariant}
+                  aiLibraryWidgetIds={aiLibraryWidgetIds}
                   getCustomWidgetById={getWidgetById}
                   hiddenMetricCardLabels={hiddenMetricCardLabels}
                   highlightedWidgetRefId={highlightedWidgetRefId}
@@ -2378,6 +2688,22 @@ export function App() {
               customWidgetSummary={customWidgetSummary}
               onGoHome={handleGoHome}
               onOpenCustomWidgets={handleOpenManageCustomWidgets}
+              onOpenTemplates={handleOpenManageTemplates}
+              templateSummary={templateSummary}
+            />
+          ) : null}
+          {homepageView === "manage-templates" ? (
+            <ManageTemplatesPage
+              activeTab={manageTemplatesTab}
+              draftTemplates={draftTemplates}
+              onAddToHomepage={handleAddTemplateToHomepage}
+              onCreateTemplate={handleCreateTemplate}
+              onDeleteTemplate={handleDeleteTemplate}
+              onEditTemplate={handleEditTemplate}
+              onGoHome={handleGoHome}
+              onGoHub={() => setHomepageView("manage-hub")}
+              onTabChange={setManageTemplatesTab}
+              publishedTemplates={publishedTemplates}
             />
           ) : null}
           {homepageView === "manage-custom-widgets" ? (
@@ -2412,8 +2738,10 @@ export function App() {
                     content: editingWidget.content,
                     size: editingWidget.size,
                     supportedSizes: editingWidget.supportedSizes,
+                    access: editingWidget.access,
                     labelAsExternalContent: editingWidget.labelAsExternalContent,
                     displayWidgetName: editingWidget.displayWidgetName,
+                    embedSource: editingWidget.embedSource,
                     embedAuthenticationMode: editingWidget.embedAuthenticationMode,
                     embedAuthenticationType: editingWidget.embedAuthenticationType,
                     embedCredentials: editingWidget.embedCredentials,
@@ -2425,11 +2753,7 @@ export function App() {
             initialStep={aiSuggestedEditorStep ?? customWidgetEditorCapture?.step}
             isEditing={Boolean(editingWidgetId)}
             widgetId={editingWidgetId}
-            onAddToHomepage={
-              editingWidget?.status === "published" && editingWidgetId
-                ? () => handleAddPublishedWidgetToHomepage(editingWidgetId)
-                : undefined
-            }
+            onAddToHomepage={handleAddCustomWidgetToHomepageFromEditor}
             onClose={handleCloseCustomWidgetEditor}
             onDelete={handleDeleteCustomWidget}
             onPublish={handlePublishCustomWidget}
@@ -2437,39 +2761,58 @@ export function App() {
             onUnpublish={handleUnpublishCustomWidget}
           />
         ) : null}
-        {isTemplateEditorOpen && aiSuggestedTemplateDraft ? (
+        {isTemplateEditorOpen && activeTemplateDraft ? (
           <HomepageTemplateEditor
-            initialDraft={aiSuggestedTemplateDraft}
-            initialStep="configure"
+            aiChatOpen={aiChatOpen}
+            initialDraft={activeTemplateDraft}
+            initialStep={
+              aiSuggestedTemplateDraft || activeTemplateDraft.name.trim()
+                ? "configure"
+                : "basic"
+            }
             onClose={handleCloseTemplateEditor}
+            onOpenAiChat={handleOpenAiChatFromTemplateEditor}
             onPublish={handlePublishTemplateDraft}
             onSave={handleSaveTemplateDraft}
           />
         ) : null}
         </main>
         <AiChatPanel
+          inputMessage={inputMessage}
           isThinking={isThinking}
           messages={messages}
-          onAddProposedCustomWidgetToHomepage={handleChatAddProposedCustomWidgetToHomepage}
+          onInputMessageChange={onInputMessageChange}
+          showEmptyStateSuggestions={showEmptyStateSuggestions}
           onAddRecommendedWidgets={handleChatAddRecommendedWidgets}
           onApplyCleanup={handleChatApplyCleanup}
           onApplyPreview={handleApplyPreview}
           onClose={closeChat}
-          onCreateProposedTeamTemplate={handleChatCreateProposedTeamTemplate}
-          onCreateWithLiveData={handleChatCreateWithLiveData}
           onNewChat={handleNewChat}
           onRegeneratePreview={handleRegeneratePreview}
+          onSaveProposedCustomWidget={handleChatSaveProposedCustomWidget}
+          onSaveProposedTeamTemplate={handleChatSaveProposedTeamTemplate}
           onSendMessage={handleSendMessage}
           onSuggestedAction={handleSuggestedAction}
           onUndoCleanup={handleChatUndoCleanup}
           onUndoPreview={handleUndoPreview}
+          onViewSavedCustomWidget={handleOpenSavedCustomWidget}
+          onViewSavedTemplate={handleOpenSavedTemplate}
           open={aiChatOpen}
           suggestionContext={suggestionContext}
           suggestions={suggestions}
           thinkingProcess={thinkingProcess}
         />
       </div>
-      {!aiChatOpen ? <AiChatBadge onClick={openChat} /> : null}
+      {!aiChatOpen && !isTemplateEditorOpen ? <AiChatBadge onClick={handleOpenAiChatBadge} /> : null}
+      {viewingAiGeneratedWidget ? (
+        <AiGeneratedWidgetDetailModal
+          onClose={() => setViewingAiGeneratedWidgetId(null)}
+          onEditWithAi={() => handleEditAiGeneratedWidgetWithAi(viewingAiGeneratedWidget.id)}
+          onPublish={() => handlePublishAiGeneratedWidget(viewingAiGeneratedWidget.id)}
+          onUnpublish={() => handleUnpublishAiGeneratedWidget(viewingAiGeneratedWidget.id)}
+          widget={viewingAiGeneratedWidget}
+        />
+      ) : null}
     </div>
   );
 }

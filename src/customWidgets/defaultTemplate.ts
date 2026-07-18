@@ -49,4 +49,4 @@ export const DEFAULT_CUSTOM_WIDGET_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-export const DEFAULT_EMBED_URL = "https://www.wikipedia.org";
+export const DEFAULT_EMBED_URL = "";

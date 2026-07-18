@@ -69,13 +69,24 @@ export const THINKING_DURATIONS_MS: Record<ThinkingMode, number> = {
   general: 2800,
 };
 
+function isMonthEndCloseDashboardPrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return (
+    normalized.includes("month-end close") ||
+    normalized.includes("month end close") ||
+    (normalized.includes("close dashboard") && normalized.includes("build"))
+  );
+}
+
 function isHomepageCreationPrompt(text: string) {
   const normalized = text.trim().toLowerCase();
 
   return (
     normalized.includes("create a homepage") ||
     normalized.includes("quick action") ||
-    normalized.includes("data overview")
+    normalized.includes("data overview") ||
+    normalized.includes("daily work")
   );
 }
 
@@ -98,16 +109,6 @@ function isHomepageCleanupPrompt(text: string) {
   );
 }
 
-function isBillingOpsTemplatePrompt(text: string) {
-  const normalized = text.trim().toLowerCase();
-
-  return (
-    (normalized.includes("billing ops") && normalized.includes("template")) ||
-    (normalized.includes("shared") && normalized.includes("billing") && normalized.includes("template")) ||
-    (normalized.includes("template") && normalized.includes("for my team") && normalized.includes("billing"))
-  );
-}
-
 function isTopAccountsTablePrompt(text: string) {
   const normalized = text.trim().toLowerCase();
 
@@ -119,6 +120,27 @@ function isTopAccountsTablePrompt(text: string) {
   );
 }
 
+function isRevenueCloseTemplatePrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return normalized.includes("revenue close") && normalized.includes("template");
+}
+
+function isFinanceLeadershipTemplatePrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return (
+    (normalized.includes("finance leadership") || normalized.includes("executive")) &&
+    normalized.includes("template")
+  );
+}
+
+function isCollectionsTemplatePrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return normalized.includes("collections") && normalized.includes("template");
+}
+
 export function getThinkingModeForPrompt(prompt: string): ThinkingMode {
   if (isHomepageCleanupPrompt(prompt)) {
     return "cleanup";
@@ -128,7 +150,11 @@ export function getThinkingModeForPrompt(prompt: string): ThinkingMode {
     return "custom-widget";
   }
 
-  if (isBillingOpsTemplatePrompt(prompt)) {
+  if (
+    isRevenueCloseTemplatePrompt(prompt) ||
+    isFinanceLeadershipTemplatePrompt(prompt) ||
+    isCollectionsTemplatePrompt(prompt)
+  ) {
     return "team-template";
   }
 
@@ -136,7 +162,7 @@ export function getThinkingModeForPrompt(prompt: string): ThinkingMode {
     return "widgets";
   }
 
-  if (isHomepageCreationPrompt(prompt)) {
+  if (isHomepageCreationPrompt(prompt) || isMonthEndCloseDashboardPrompt(prompt)) {
     return "homepage";
   }
 

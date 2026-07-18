@@ -7,7 +7,6 @@ import {
   getHomepageConfigRegenerateResponse,
   getSuggestionsForContext,
 } from "./homepageConfigAssistant";
-import { buildTopAccountsLiveDataProposal } from "./assistantProposals";
 import {
   getThinkingModeForPrompt,
   THINKING_DURATIONS_MS,
@@ -17,6 +16,7 @@ import {
 import type {
   AiChatSuggestionContext,
   ChatMessage,
+  ChatPreview,
   CustomWidgetProposal,
   SuggestedAction,
   TeamTemplateProposal,
@@ -72,11 +72,10 @@ export function useAiHomepageConfigChat(options: {
   isEmptyHomepage?: boolean;
   layout: HomepageLayout;
   onAddWidgets?: (widgetIds: string[]) => void;
-  onAddProposedCustomWidgetToHomepage?: (proposal: CustomWidgetProposal) => string | undefined;
   onApplyCleanup?: (plan: HomepageCleanupPlan) => void;
-  onApplyPreview?: () => void;
-  onCreateProposedCustomWidget?: (proposal: CustomWidgetProposal, widgetId?: string) => void;
-  onCreateProposedTeamTemplate?: (proposal: TeamTemplateProposal) => void;
+  onApplyPreview?: (preview?: ChatPreview) => void;
+  onSaveProposedTeamTemplate?: (proposal: TeamTemplateProposal) => string | undefined;
+  onSaveProposedCustomWidget?: (proposal: CustomWidgetProposal) => string | undefined;
   onUndoCleanup?: () => void;
   onUndoPreview?: () => void;
   removedWidgetIds: DashboardWidgetId[];
@@ -87,6 +86,8 @@ export function useAiHomepageConfigChat(options: {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [suggestionContext, setSuggestionContext] = useState<AiChatSuggestionContext>("homepage");
   const [thinkingProcess, setThinkingProcess] = useState<ThinkingProcess | null>(null);
+  const [inputMessage, setInputMessage] = useState("");
+  const [showEmptyStateSuggestions, setShowEmptyStateSuggestions] = useState(true);
   const requestIdRef = useRef(0);
   const isThinking = thinkingProcess !== null;
   const suggestions = useMemo(
@@ -99,11 +100,25 @@ export function useAiHomepageConfigChat(options: {
   }, []);
 
   const startChat = useCallback(
-    (options?: { context?: AiChatSuggestionContext; reset?: boolean }) => {
+    (options?: {
+      context?: AiChatSuggestionContext;
+      draftMessage?: string;
+      reset?: boolean;
+      showEmptyStateSuggestions?: boolean;
+    }) => {
       if (options?.reset) {
         requestIdRef.current += 1;
         setThinkingProcess(null);
         setMessages([]);
+        setInputMessage(options?.draftMessage?.trim() ?? "");
+      } else if (options?.draftMessage !== undefined) {
+        setInputMessage(options.draftMessage.trim());
+      }
+
+      if (options?.showEmptyStateSuggestions !== undefined) {
+        setShowEmptyStateSuggestions(options.showEmptyStateSuggestions);
+      } else if (options?.reset) {
+        setShowEmptyStateSuggestions(true);
       }
 
       if (options?.context) {
@@ -123,6 +138,8 @@ export function useAiHomepageConfigChat(options: {
     requestIdRef.current += 1;
     setThinkingProcess(null);
     setMessages([]);
+    setInputMessage("");
+    setShowEmptyStateSuggestions(true);
   }, []);
 
   const handleNewChat = useCallback(() => {
@@ -198,6 +215,7 @@ export function useAiHomepageConfigChat(options: {
         return;
       }
 
+      setInputMessage("");
       void respondToPrompt(text);
     },
     [isThinking, respondToPrompt],
@@ -209,9 +227,9 @@ export function useAiHomepageConfigChat(options: {
         return;
       }
 
-      void respondToPrompt(action.prompt);
+      setInputMessage(action.prompt);
     },
-    [isThinking, respondToPrompt],
+    [isThinking],
   );
 
   const handleRegeneratePreview = useCallback(
@@ -312,7 +330,8 @@ export function useAiHomepageConfigChat(options: {
 
   const handleApplyPreview = useCallback(
     (messageId: string) => {
-      options.onApplyPreview?.();
+      const message = messages.find((entry) => entry.id === messageId);
+      options.onApplyPreview?.(message?.preview);
 
       setMessages((current) =>
         current.map((message) => ({
@@ -321,7 +340,7 @@ export function useAiHomepageConfigChat(options: {
         })),
       );
     },
-    [options.onApplyPreview],
+    [messages, options.onApplyPreview],
   );
 
   const handleUndoPreview = useCallback(
@@ -337,69 +356,46 @@ export function useAiHomepageConfigChat(options: {
     [options.onUndoPreview],
   );
 
-  const handleCreateProposedTeamTemplate = useCallback(
+  const handleSaveProposedTeamTemplate = useCallback(
     (messageId: string, proposal: TeamTemplateProposal) => {
-      options.onCreateProposedTeamTemplate?.(proposal);
-
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === messageId ? { ...message, teamTemplateCreated: true } : message,
-        ),
-      );
-    },
-    [options.onCreateProposedTeamTemplate],
-  );
-
-  const handleCreateWithLiveData = useCallback(
-    (messageId: string, proposal: CustomWidgetProposal) => {
-      if (!proposal.supportsLiveData) {
-        return;
-      }
-
-      const liveProposal = buildTopAccountsLiveDataProposal();
-      const existingWidgetId = messages.find((message) => message.id === messageId)
-        ?.proposedCustomWidgetId;
-
-      options.onCreateProposedCustomWidget?.(
-        {
-          draft: liveProposal.draft,
-          previewSummary: liveProposal.querySummary,
-          rationale: [],
-        },
-        existingWidgetId,
-      );
-
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === messageId ? { ...message, liveDataWidgetCreated: true } : message,
-        ),
-      );
-    },
-    [messages, options.onCreateProposedCustomWidget],
-  );
-
-  const handleAddProposedCustomWidgetToHomepage = useCallback(
-    (messageId: string, proposal: CustomWidgetProposal) => {
-      if (!proposal.supportsLiveData) {
-        return;
-      }
-
-      const widgetId = options.onAddProposedCustomWidgetToHomepage?.(proposal);
+      const templateId = options.onSaveProposedTeamTemplate?.(proposal);
 
       setMessages((current) =>
         current.map((message) =>
           message.id === messageId
             ? {
                 ...message,
-                liveDataWidgetAdded: true,
-                liveDataWidgetCreated: true,
+                teamTemplateSaved: true,
+                proposedTemplateId: templateId ?? message.proposedTemplateId,
+              }
+            : message,
+        ),
+      );
+    },
+    [options.onSaveProposedTeamTemplate],
+  );
+
+  const handleSaveProposedCustomWidget = useCallback(
+    (messageId: string, proposal: CustomWidgetProposal) => {
+      if (!proposal.supportsLiveData) {
+        return;
+      }
+
+      const widgetId = options.onSaveProposedCustomWidget?.(proposal);
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                customWidgetSaved: true,
                 proposedCustomWidgetId: widgetId ?? message.proposedCustomWidgetId,
               }
             : message,
         ),
       );
     },
-    [options.onAddProposedCustomWidgetToHomepage],
+    [options.onSaveProposedCustomWidget],
   );
 
   return {
@@ -408,19 +404,21 @@ export function useAiHomepageConfigChat(options: {
     handleAddRecommendedWidgets,
     handleApplyCleanup,
     handleApplyPreview,
-    handleAddProposedCustomWidgetToHomepage,
-    handleCreateProposedTeamTemplate,
-    handleCreateWithLiveData,
+    handleSaveProposedTeamTemplate,
     handleNewChat,
     handleRegeneratePreview,
+    handleSaveProposedCustomWidget,
     handleSendMessage,
     handleSuggestedAction,
     handleUndoCleanup,
     handleUndoPreview,
+    inputMessage,
     isThinking,
     messages,
+    onInputMessageChange: setInputMessage,
     openChat,
     resetConversation,
+    showEmptyStateSuggestions,
     startChat,
     suggestionContext,
     suggestions,

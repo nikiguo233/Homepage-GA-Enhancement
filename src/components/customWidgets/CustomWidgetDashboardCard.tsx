@@ -22,17 +22,22 @@ export const CustomWidgetDashboardCard = forwardRef<
   ]
     .filter(Boolean)
     .join(" ");
+  const previewWidget = {
+    ...widget,
+    displayWidgetName: false,
+  };
+  const showCardHeader = widget.type === "embed" && !widget.displayWidgetName;
 
   return (
     <article className={cardClassName} ref={ref}>
       <div className="widget-card-inner widget-card-inner-gap-8">
-        {!widget.displayWidgetName ? (
+        {showCardHeader ? (
           <header className="custom-widget-dashboard-header">
             <h3>{widget.name}</h3>
           </header>
         ) : null}
         <div className="custom-widget-dashboard-preview">
-          <CustomWidgetPreviewFrame interactive size={size} widget={widget} />
+          <CustomWidgetPreviewFrame interactive size={size} widget={previewWidget} />
         </div>
       </div>
     </article>

@@ -1,26 +1,87 @@
 import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
-import type { AiRecommendation } from "./types";
+import type { AiRecommendation, RecommendedWidget } from "./types";
+
+export const AI_RECOMMENDATION_TOP_ACCOUNTS_ID = "ai-recommendation:top-accounts";
 
 export const HOMEPAGE_CREATION_RECOMMENDATIONS: AiRecommendation[] = [
   {
     name: "Active Contracts",
     reason: "Shows contract volume at a glance so you can gauge revenue pipeline health.",
+    source: "ai-generated",
   },
   {
     name: "Deferred Revenue",
     reason: "Tracks unrecognized revenue to catch timing issues before close.",
+    source: "ai-generated",
   },
   {
     name: "Compliance Risk",
     reason: "Flags ASC 606 exposure early so finance can act before reporting.",
+    source: "ai-generated",
   },
   {
     name: "Close Readiness",
     reason: "Summarizes period-close progress so blockers are visible immediately.",
+    source: "ai-generated",
   },
   {
     name: "Revenue Recognition Trend",
     reason: "Reveals monthly patterns to spot anomalies and forecast recognition.",
+    source: "library",
+  },
+];
+
+export const MONTH_END_CLOSE_LIBRARY_WIDGET_IDS: DashboardWidgetId[] = [
+  "revenue-progress",
+  "revenue-tasks",
+  "run-report",
+];
+
+export const MONTH_END_CLOSE_DASHBOARD_RECOMMENDATIONS: AiRecommendation[] = [
+  {
+    name: "Close Readiness",
+    reason: "Tracks period-close completion so you can spot blockers before sign-off.",
+    source: "ai-generated",
+  },
+  {
+    name: "Open Exceptions",
+    reason: "Surfaces unresolved items that must be cleared before you can close the period.",
+    source: "ai-generated",
+  },
+  {
+    name: "Compliance Risk",
+    reason: "Highlights ASC 606 exposure that needs review before the books close.",
+    source: "ai-generated",
+  },
+  {
+    name: "Deferred Revenue",
+    reason: "Shows unrecognized revenue balances that may need close adjustments.",
+    source: "ai-generated",
+  },
+  {
+    name: "Close Process Status",
+    reason: "From your widget library — keeps close milestones and blockers visible in one view.",
+    source: "library",
+  },
+  {
+    name: "Revenue Tasks",
+    reason: "From your widget library — lists exceptions and actions that must finish before close.",
+    source: "library",
+  },
+  {
+    name: "Zuora Revenue Report",
+    reason: "From your widget library — puts close-related reports and recent downloads one click away.",
+    source: "library",
+  },
+];
+
+export const AI_GENERATED_WIDGET_RECOMMENDATIONS: RecommendedWidget[] = [
+  {
+    id: AI_RECOMMENDATION_TOP_ACCOUNTS_ID,
+    name: "Top Accounts by Open Balance",
+    description: "Custom HTML table ranking the top 10 accounts by open balance.",
+    reason: "Surfaces high-risk receivables so billing teams can prioritize follow-up.",
+    source: "ai-generated",
   },
 ];
 

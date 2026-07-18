@@ -3,14 +3,19 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getTemplatePreviewCustomWidget } from "../homepageConfig/teamTemplate";
+import type { AiGeneratedDashboardVariant } from "../ai/types";
 import type { CustomWidget } from "../customWidgets/types";
+import type { DashboardWidgetId } from "./dashboardWidgets/catalog";
 import { AiGeneratedDashboard } from "./AiGeneratedDashboard";
 
 const PREVIEW_REFERENCE_WIDTH = 1120;
 
 type AiChatDashboardPreviewProps = {
-  widgetIds?: string[];
   getCustomWidgetById?: (widgetId: string) => CustomWidget | undefined;
+  libraryWidgetIds?: DashboardWidgetId[];
+  showWidgetSources?: boolean;
+  variant?: AiGeneratedDashboardVariant;
+  widgetIds?: string[];
 };
 
 function resolvePreviewCustomWidget(widgetId: string): CustomWidget | undefined {
@@ -19,6 +24,9 @@ function resolvePreviewCustomWidget(widgetId: string): CustomWidget | undefined 
 
 function AiChatDashboardPreviewThumbnail({
   getCustomWidgetById = resolvePreviewCustomWidget,
+  libraryWidgetIds = [],
+  showWidgetSources = false,
+  variant = "default",
   widgetIds = [],
 }: AiChatDashboardPreviewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -49,7 +57,7 @@ function AiChatDashboardPreviewThumbnail({
     return () => {
       observer.disconnect();
     };
-  }, [widgetIds]);
+  }, [libraryWidgetIds, variant, widgetIds]);
 
   return (
     <div className="ai-chat-preview-thumbnail" ref={containerRef} style={{ height }}>
@@ -65,6 +73,9 @@ function AiChatDashboardPreviewThumbnail({
         <AiGeneratedDashboard
           addedWidgetIds={widgetIds}
           getCustomWidgetById={getCustomWidgetById ?? resolvePreviewCustomWidget}
+          libraryWidgetIds={libraryWidgetIds}
+          showWidgetSources={showWidgetSources}
+          variant={variant}
         />
       </div>
     </div>
@@ -73,7 +84,10 @@ function AiChatDashboardPreviewThumbnail({
 
 function AiChatDashboardPreviewModal({
   getCustomWidgetById = resolvePreviewCustomWidget,
+  libraryWidgetIds = [],
   onClose,
+  showWidgetSources = false,
+  variant = "default",
   widgetIds = [],
 }: AiChatDashboardPreviewProps & { onClose: () => void }) {
   const titleId = useId();
@@ -128,6 +142,9 @@ function AiChatDashboardPreviewModal({
           <AiGeneratedDashboard
             addedWidgetIds={widgetIds}
             getCustomWidgetById={getCustomWidgetById ?? resolvePreviewCustomWidget}
+            libraryWidgetIds={libraryWidgetIds}
+            showWidgetSources={showWidgetSources}
+            variant={variant}
           />
         </div>
       </div>
@@ -138,6 +155,9 @@ function AiChatDashboardPreviewModal({
 
 export function AiChatHomepagePreview({
   getCustomWidgetById,
+  libraryWidgetIds,
+  showWidgetSources = false,
+  variant,
   widgetIds = [],
 }: AiChatDashboardPreviewProps = {}) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -152,6 +172,9 @@ export function AiChatHomepagePreview({
       >
         <AiChatDashboardPreviewThumbnail
           getCustomWidgetById={getCustomWidgetById}
+          libraryWidgetIds={libraryWidgetIds}
+          showWidgetSources={showWidgetSources}
+          variant={variant}
           widgetIds={widgetIds}
         />
         <span aria-hidden="true" className="ai-chat-preview-thumbnail-overlay">
@@ -162,7 +185,10 @@ export function AiChatHomepagePreview({
       {modalOpen ? (
         <AiChatDashboardPreviewModal
           getCustomWidgetById={getCustomWidgetById}
+          libraryWidgetIds={libraryWidgetIds}
           onClose={() => setModalOpen(false)}
+          showWidgetSources={showWidgetSources}
+          variant={variant}
           widgetIds={widgetIds}
         />
       ) : null}

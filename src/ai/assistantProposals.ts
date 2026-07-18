@@ -76,21 +76,6 @@ export const TOP_ACCOUNTS_WIDGET_RATIONALE: AiRecommendation[] = [
   },
 ];
 
-export const BILLING_OPS_TEMPLATE_RATIONALE: AiRecommendation[] = [
-  {
-    name: "Revenue Tasks",
-    reason: "Surfaces billing exceptions that need action before invoices can be sent or collected.",
-  },
-  {
-    name: "File Upload",
-    reason: "Keeps payment and adjustment file ingest one click away for daily billing operations.",
-  },
-  {
-    name: "Top Accounts by Open Balance",
-    reason: "Gives the team a shared view of the highest-risk receivables on every homepage.",
-  },
-];
-
 function buildTopAccountsWidgetBase(): Omit<CustomWidgetDraft, "content" | "dataBinding"> {
   return {
     name: "Top Accounts by Open Balance",
@@ -98,8 +83,10 @@ function buildTopAccountsWidgetBase(): Omit<CustomWidgetDraft, "content" | "data
     type: "html",
     size: "6x4",
     supportedSizes: ["3x3", "6x3", "6x4"],
+    access: "private",
     labelAsExternalContent: false,
-    displayWidgetName: true,
+    displayWidgetName: false,
+    embedSource: "",
     embedAuthenticationMode: "shared-credentials",
     embedAuthenticationType: "",
     embedCredentials: {
@@ -147,15 +134,75 @@ export function buildTopAccountsLiveDataProposal(): WidgetDataBindingProposal {
   };
 }
 
-export const BILLING_OPS_TEAM_TEMPLATE_PROPOSAL: TeamTemplateProposal = {
-  id: "billing-ops",
-  name: "Billing Ops",
-  description:
-    "A shared homepage starter for billing operations teams with task tracking, file upload access, and an open-balance leaderboard.",
-  audience: "Billing Operations",
-  includedItems: BILLING_OPS_TEMPLATE_RATIONALE,
+export const REVENUE_CLOSE_TEAM_TEMPLATE_PROPOSAL: TeamTemplateProposal = {
+  id: "revenue-close",
+  name: "Revenue Close",
+  description: "Monitor close milestones, pending tasks, and reporting in one workspace.",
+  audience: "Revenue Accounting",
+  includedItems: [
+    {
+      name: "Close Process Status",
+      reason: "Keeps close milestones and blockers visible for the accounting team.",
+    },
+    {
+      name: "Revenue Tasks",
+      reason: "Surfaces exceptions that need action before period close.",
+    },
+    {
+      name: "Zuora Revenue Report",
+      reason: "Gives quick access to close-related reports and recent downloads.",
+    },
+  ],
   sharingNote:
-    "Publishing this template makes it available in your team's widget library so Billing Ops members can apply the same homepage layout.",
+    "Publishing this template makes it available for revenue accounting teams to apply the same close-focused homepage layout.",
+  suggestedWidgetIds: ["revenue-progress", "revenue-tasks", "run-report"],
+};
+
+export const FINANCE_LEADERSHIP_TEAM_TEMPLATE_PROPOSAL: TeamTemplateProposal = {
+  id: "finance-leadership",
+  name: "Finance Leadership",
+  description: "Executive overview of revenue performance, close status, and reporting.",
+  audience: "Finance Leadership",
+  includedItems: [
+    {
+      name: "Revenue Overview",
+      reason: "Provides a high-level regional revenue snapshot for leadership reviews.",
+    },
+    {
+      name: "Close Process Status",
+      reason: "Shows whether the team is on track during close cycles.",
+    },
+    {
+      name: "Zuora Revenue Report",
+      reason: "Makes reporting one click away for executive check-ins.",
+    },
+  ],
+  sharingNote:
+    "Publishing this template gives finance leaders a consistent executive homepage across the organization.",
+  suggestedWidgetIds: ["revenue-overview", "revenue-progress", "run-report"],
+};
+
+export const COLLECTIONS_TEAM_TEMPLATE_PROPOSAL: TeamTemplateProposal = {
+  id: "collections-team",
+  name: "Collections Team",
+  description: "Prioritize collections work with tasks, uploads, and account visibility.",
+  audience: "Collections",
+  includedItems: [
+    {
+      name: "Revenue Tasks",
+      reason: "Highlights billing exceptions that need collections follow-up.",
+    },
+    {
+      name: "File Upload",
+      reason: "Keeps payment and adjustment file ingest close at hand.",
+    },
+    {
+      name: "Top Accounts by Open Balance",
+      reason: "Helps the team focus on the highest-risk receivables first.",
+    },
+  ],
+  sharingNote:
+    "Publishing this template lets collections teams share the same receivables-focused homepage layout.",
   suggestedWidgetIds: ["revenue-tasks", "file-upload"],
   previewCustomWidgetRefs: [TEMPLATE_PREVIEW_TOP_ACCOUNTS_REF],
 };

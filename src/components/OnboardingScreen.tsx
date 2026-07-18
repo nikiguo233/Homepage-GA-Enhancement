@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import billingStandardPreviewUrl from "../assets/onboarding-billing-standard.png";
 import developerPreviewUrl from "../assets/onboarding-developer.png";
 import revenueStandardPreviewUrl from "../assets/onboarding-revenue-standard.png";
-import { AiButton } from "./AiButton";
+import { OnboardingAiDropdown } from "./OnboardingAiDropdown";
 
 const ONBOARDING_TEMPLATES = [
   {
@@ -31,13 +31,16 @@ const ONBOARDING_TEMPLATES = [
 export type OnboardingTemplateId = (typeof ONBOARDING_TEMPLATES)[number]["id"];
 
 export function OnboardingScreen({
-  onCreateWithAi,
+  onOpenAiChat,
+  onSelectAiPrompt,
   onSelectTemplate,
 }: {
-  onCreateWithAi: () => void;
+  onOpenAiChat: () => void;
+  onSelectAiPrompt: (prompt: string) => void;
   onSelectTemplate: (templateId: OnboardingTemplateId) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [aiDropdownExpanded, setAiDropdownExpanded] = useState(false);
 
   const filteredTemplates = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase();
@@ -59,7 +62,7 @@ export function OnboardingScreen({
         <div className="onboarding-screen-gradient" />
       </div>
 
-      <div className="onboarding-screen-content">
+      <div className={`onboarding-screen-content${aiDropdownExpanded ? " is-ai-dropdown-expanded" : ""}`}>
         <header className="onboarding-screen-header">
           <h1 className="onboarding-screen-title">Set Up Your Home Page</h1>
           <p className="onboarding-screen-subtitle">
@@ -99,9 +102,11 @@ export function OnboardingScreen({
         </div>
 
         <div className="onboarding-screen-actions">
-          <AiButton background="dark" onClick={onCreateWithAi} variant="primary">
-            Create with Zuora AI
-          </AiButton>
+          <OnboardingAiDropdown
+            onExpandedChange={setAiDropdownExpanded}
+            onOpenAiChat={onOpenAiChat}
+            onSelectPrompt={onSelectAiPrompt}
+          />
         </div>
       </div>
     </div>

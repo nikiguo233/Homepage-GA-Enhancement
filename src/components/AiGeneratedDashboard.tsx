@@ -1,14 +1,24 @@
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { useMemo, useState } from "react";
+import type { AiGeneratedDashboardVariant } from "../ai/types";
 import { AiAddedWidgets } from "./AiAddedWidgets";
+import type { DashboardWidgetId } from "./dashboardWidgets/catalog";
 import type { CustomWidget } from "../customWidgets/types";
 import type { RefObject } from "react";
+import { WidgetSourceBadge } from "./WidgetSourceBadge";
 
-const metricCards = [
+const defaultMetricCards = [
   { change: "+12%", label: "Active Contracts", value: "1,284" },
   { change: "+4.5%", label: "Deferred Revenue", value: "$4.2M" },
   { change: "0%", label: "Compliance Risk", value: "Low" },
   { change: "+3%", label: "Close Readiness", value: "84%" },
+] as const;
+
+const monthEndCloseMetricCards = [
+  { change: "+3%", label: "Close Readiness", value: "84%" },
+  { change: "+2", label: "Open Exceptions", value: "12" },
+  { change: "0%", label: "Compliance Risk", value: "Low" },
+  { change: "+4.5%", label: "Deferred Revenue", value: "$4.2M" },
 ] as const;
 
 const trendData = [
@@ -59,15 +69,18 @@ function getYAxisScale(maxValue: number) {
 function AiMetricCard({
   change,
   label,
+  showSourceBadge = false,
   value,
 }: {
   change: string;
   label: string;
+  showSourceBadge?: boolean;
   value: string;
 }) {
   return (
-    <section className="widget-card widget-card-metric">
+    <section className="widget-card widget-card-metric ai-dashboard-widget-card">
       <div className="widget-card-inner widget-card-inner-gap-8">
+        {showSourceBadge ? <WidgetSourceBadge className="ai-dashboard-widget-source-badge" source="ai-generated" /> : null}
         <span className="ai-metric-card-label">{label}</span>
         <div className="ai-metric-card-value-row">
           <strong>{value}</strong>
@@ -78,7 +91,7 @@ function AiMetricCard({
   );
 }
 
-function AiRevenueTrendChart() {
+function AiRevenueTrendChart({ showSourceBadge = false }: { showSourceBadge?: boolean }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const { max: yAxisMax, ticks: yAxisTicks } = useMemo(
     () => getYAxisScale(Math.max(...trendData.map((point) => point.value))),
@@ -86,8 +99,11 @@ function AiRevenueTrendChart() {
   );
 
   return (
-    <section className="widget-card widget-card-chart">
+    <section className="widget-card widget-card-chart ai-dashboard-widget-card">
       <div className="widget-card-inner widget-card-inner-gap-16">
+        {showSourceBadge ? (
+          <WidgetSourceBadge className="ai-dashboard-widget-source-badge" source="library" />
+        ) : null}
         <div className="card-header">
           <div>
             <h3>Revenue Recognition Trend</h3>
@@ -175,29 +191,43 @@ export function AiGeneratedDashboard({
   getCustomWidgetById,
   hiddenMetricCardLabels = [],
   highlightedWidgetRefId,
+  libraryWidgetIds = [],
+  showWidgetSources = false,
+  variant = "default",
   widgetRef,
 }: {
   addedWidgetIds?: string[];
   getCustomWidgetById?: (widgetId: string) => CustomWidget | undefined;
   hiddenMetricCardLabels?: string[];
   highlightedWidgetRefId?: string | null;
+  libraryWidgetIds?: DashboardWidgetId[];
+  showWidgetSources?: boolean;
+  variant?: AiGeneratedDashboardVariant;
   widgetRef?: RefObject<HTMLElement | null>;
 }) {
+  const metricCards = variant === "month-end-close" ? monthEndCloseMetricCards : defaultMetricCards;
   const visibleMetricCards = metricCards.filter((card) => !hiddenMetricCardLabels.includes(card.label));
+  const showTrendChart = variant === "default";
 
   return (
     <section className="ai-generated-dashboard" data-node-id="225:41367">
       <div className={`ai-metric-grid${visibleMetricCards.length < 4 ? " ai-metric-grid-compact" : ""}`}>
         {visibleMetricCards.map((card) => (
-          <AiMetricCard change={card.change} key={card.label} label={card.label} value={card.value} />
+          <AiMetricCard
+            change={card.change}
+            key={card.label}
+            label={card.label}
+            showSourceBadge={showWidgetSources}
+            value={card.value}
+          />
         ))}
       </div>
-      <AiRevenueTrendChart />
+      {showTrendChart ? <AiRevenueTrendChart showSourceBadge={showWidgetSources} /> : null}
       <AiAddedWidgets
         addedWidgetIds={addedWidgetIds}
         getCustomWidgetById={getCustomWidgetById}
         highlightedWidgetRefId={highlightedWidgetRefId}
-        widgetIds={addedWidgetIds}
+        widgetIds={libraryWidgetIds}
         widgetRef={widgetRef}
       />
     </section>

@@ -6,10 +6,14 @@ export function ManageTemplatesHubPage({
   customWidgetSummary,
   onGoHome,
   onOpenCustomWidgets,
+  onOpenTemplates,
+  templateSummary,
 }: {
   customWidgetSummary: string;
   onGoHome: () => void;
   onOpenCustomWidgets: () => void;
+  onOpenTemplates: () => void;
+  templateSummary: string;
 }) {
   return (
     <section className="custom-widget-management-page custom-widget-hub-page">
@@ -30,13 +34,13 @@ export function ManageTemplatesHubPage({
             </p>
           </div>
           <div className="custom-widget-hub-grid">
-            <article className="custom-widget-hub-card">
+            <button className="custom-widget-hub-card" onClick={onOpenTemplates} type="button">
               <div className="custom-widget-hub-card-icon custom-widget-hub-card-icon-templates">
                 <ViewCompactOutlinedIcon />
               </div>
               <h2>Templates</h2>
-              <p>12 Published, 5 Drafts</p>
-            </article>
+              <p>{templateSummary}</p>
+            </button>
             <button className="custom-widget-hub-card" onClick={onOpenCustomWidgets} type="button">
               <div className="custom-widget-hub-card-icon custom-widget-hub-card-icon-widgets">
                 <WidgetsOutlinedIcon />

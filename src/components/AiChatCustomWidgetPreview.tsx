@@ -5,11 +5,29 @@ import { createPortal } from "react-dom";
 import type { CustomWidgetDraft } from "../customWidgets/types";
 import { CustomWidgetPreviewFrame } from "./customWidgets/CustomWidgetPreviewFrame";
 
-function AiChatCustomWidgetPreviewThumbnail({ draft }: { draft: CustomWidgetDraft }) {
+export function AiChatCustomWidgetPreview({ draft }: { draft: CustomWidgetDraft }) {
+  const [modalOpen, setModalOpen] = useState(false);
+
   return (
-    <div className="ai-chat-custom-widget-preview-thumbnail">
-      <CustomWidgetPreviewFrame compact dense size={draft.size} widget={draft} />
-    </div>
+    <>
+      <button
+        aria-label="Open widget preview"
+        className="ai-chat-preview-thumbnail-button ai-chat-custom-widget-preview-button"
+        onClick={() => setModalOpen(true)}
+        type="button"
+      >
+        <div className="ai-chat-custom-widget-preview-thumbnail">
+          <CustomWidgetPreviewFrame compact dense size={draft.size} widget={draft} />
+          <span aria-hidden="true" className="ai-chat-preview-thumbnail-overlay">
+            <OpenInNewIcon />
+            <span>Preview</span>
+          </span>
+        </div>
+      </button>
+      {modalOpen ? (
+        <AiChatCustomWidgetPreviewModal draft={draft} onClose={() => setModalOpen(false)} />
+      ) : null}
+    </>
   );
 }
 
@@ -74,29 +92,5 @@ function AiChatCustomWidgetPreviewModal({
       </div>
     </div>,
     document.body,
-  );
-}
-
-export function AiChatCustomWidgetPreview({ draft }: { draft: CustomWidgetDraft }) {
-  const [modalOpen, setModalOpen] = useState(false);
-
-  return (
-    <>
-      <button
-        aria-label="Open widget preview"
-        className="ai-chat-preview-thumbnail-button"
-        onClick={() => setModalOpen(true)}
-        type="button"
-      >
-        <AiChatCustomWidgetPreviewThumbnail draft={draft} />
-        <span aria-hidden="true" className="ai-chat-preview-thumbnail-overlay">
-          <OpenInNewIcon />
-          <span>Preview</span>
-        </span>
-      </button>
-      {modalOpen ? (
-        <AiChatCustomWidgetPreviewModal draft={draft} onClose={() => setModalOpen(false)} />
-      ) : null}
-    </>
   );
 }

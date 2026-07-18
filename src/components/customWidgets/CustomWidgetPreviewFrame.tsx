@@ -11,7 +11,7 @@ import {
 import { buildWidgetPreviewDocument } from "../../customWidgets/previewDocument";
 import { buildShowcasePreviewDocument } from "../../customWidgets/showcasePreviewDocument";
 import type { CustomWidget, CustomWidgetSize } from "../../customWidgets/types";
-import { getWidgetDesignDimensions } from "../../customWidgets/widgetSizes";
+import { getWidgetDesignDimensions, getWidgetGridSlotDimensions } from "../../customWidgets/widgetSizes";
 
 const EMBED_LOAD_HINT_DELAY_MS = 8000;
 
@@ -20,12 +20,14 @@ type EmbedLoadState = "idle" | "loading" | "ready" | "unavailable";
 export function CustomWidgetPreviewFrame({
   compact = false,
   dense = false,
+  gridFit = false,
   interactive,
   size = "3x3",
   widget,
 }: {
   compact?: boolean;
   dense?: boolean;
+  gridFit?: boolean;
   interactive?: boolean;
   size?: CustomWidgetSize;
   widget: Pick<
@@ -41,7 +43,9 @@ export function CustomWidgetPreviewFrame({
   const [useShowcaseFallback, setUseShowcaseFallback] = useState(false);
   const isInteractive = interactive ?? !compact;
   const isInteractiveEmbed = widget.type === "embed" && isInteractive;
-  const { width: designWidth, height: designHeight } = getWidgetDesignDimensions(size);
+  const { width: designWidth, height: designHeight } = gridFit
+    ? getWidgetGridSlotDimensions(size, { editorPreview: true })
+    : getWidgetDesignDimensions(size);
   const embedValidation =
     widget.type === "embed" ? validateEmbedUrl(widget.content) : null;
   const embedTargetUrl =
@@ -56,6 +60,11 @@ export function CustomWidgetPreviewFrame({
   useLayoutEffect(() => {
     const shell = shellRef.current;
     if (!shell) {
+      return;
+    }
+
+    if (gridFit) {
+      setScale(1);
       return;
     }
 
@@ -92,7 +101,7 @@ export function CustomWidgetPreviewFrame({
       window.cancelAnimationFrame(frameId);
       window.clearTimeout(timeoutId);
     };
-  }, [designHeight, designWidth]);
+  }, [designHeight, designWidth, gridFit]);
 
   useEffect(() => {
     if (widget.type !== "embed" || !embedSrc) {
@@ -130,13 +139,19 @@ export function CustomWidgetPreviewFrame({
     "custom-widget-preview-shell",
     compact ? "is-compact" : "",
     dense ? "is-dense" : "",
+    gridFit ? "is-grid-fit" : "",
     isInteractive ? "is-interactive" : "",
     isInteractiveEmbed ? "is-interactive-embed" : "",
     widget.type === "embed" ? "is-embed" : "",
   ]
     .filter(Boolean)
     .join(" ");
-  const shellStyle: CSSProperties = compact
+  const shellStyle: CSSProperties = gridFit
+    ? {
+        height: "100%",
+        width: "100%",
+      }
+    : compact
     ? dense
       ? {
           aspectRatio: `${designWidth} / ${designHeight}`,
@@ -153,26 +168,41 @@ export function CustomWidgetPreviewFrame({
         }
     : { aspectRatio: `${designWidth} / ${designHeight}` };
 
-  const designSurfaceStyle: CSSProperties = {
-    height: designHeight,
-    width: designWidth,
-  };
+  const designSurfaceStyle: CSSProperties = gridFit
+    ? {
+        height: "100%",
+        width: "100%",
+      }
+    : {
+        height: designHeight,
+        width: designWidth,
+      };
 
-  const scaledLayerStyle: CSSProperties = {
-    ...designSurfaceStyle,
-    transform: `scale(${scale})`,
-    transformOrigin: "top left",
-  };
+  const scaledLayerStyle: CSSProperties = gridFit
+    ? {
+        ...designSurfaceStyle,
+        transform: "none",
+      }
+    : {
+        ...designSurfaceStyle,
+        transform: `scale(${scale})`,
+        transformOrigin: "top left",
+      };
 
   const iframeStyle: CSSProperties = {
     ...designSurfaceStyle,
     display: "block",
   };
 
-  const scalerStyle: CSSProperties = {
-    height: designHeight * scale,
-    width: designWidth * scale,
-  };
+  const scalerStyle: CSSProperties = gridFit
+    ? {
+        height: "100%",
+        width: "100%",
+      }
+    : {
+        height: designHeight * scale,
+        width: designWidth * scale,
+      };
 
   const handleEmbedLoad = () => {
     setEmbedLoadState("ready");
@@ -247,6 +277,7 @@ export function CustomWidgetPreviewFrame({
         scrolling={compact ? "no" : "auto"}
         srcDoc={buildWidgetPreviewDocument(widget.content, size, compact, {
           dense,
+          gridFit,
           useLiveData: usesLiveData,
         })}
         style={iframeStyle}

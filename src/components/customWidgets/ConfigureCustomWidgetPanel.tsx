@@ -52,12 +52,12 @@ export function ConfigureCustomWidgetPanel({
       </div>
 
       <div className="widget-config-section">
-        <h3>Widget Size</h3>
+        <h3>Supported Widget Sizes</h3>
         <hr className="widget-config-divider" />
       </div>
 
       <div className="widget-config-size-panel">
-        <div className="widget-config-size-options" role="radiogroup" aria-label="Widget size">
+        <div className="widget-config-size-options" role="radiogroup" aria-label="Supported widget sizes">
           {widget.supportedSizes.map((size) => (
             <label className="widget-config-size-option" key={size}>
               <input

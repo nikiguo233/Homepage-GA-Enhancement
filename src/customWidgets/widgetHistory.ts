@@ -1,5 +1,6 @@
 import type { CustomWidget, CustomWidgetDraft, CustomWidgetHistoryAction } from "./types";
 import { getWidgetSizeLabel } from "./widgetSizes";
+import { getCustomWidgetAccessLabel } from "./widgetAccess";
 
 export function createHistoryId() {
   return `cwh-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -66,6 +67,12 @@ function summarizeDraftChanges(previous: CustomWidget, draft: CustomWidgetDraft)
     details.push(`Supported sizes: ${previousSupported} → ${nextSupported}`);
   }
 
+  if (previous.access !== draft.access) {
+    details.push(
+      `Access: ${getCustomWidgetAccessLabel(previous.access)} → ${getCustomWidgetAccessLabel(draft.access)}`,
+    );
+  }
+
   if (previous.labelAsExternalContent !== draft.labelAsExternalContent) {
     details.push(
       draft.labelAsExternalContent
@@ -74,11 +81,6 @@ function summarizeDraftChanges(previous: CustomWidget, draft: CustomWidgetDraft)
     );
   }
 
-  if (previous.displayWidgetName !== draft.displayWidgetName) {
-    details.push(
-      draft.displayWidgetName ? "Enabled widget name display" : "Disabled widget name display",
-    );
-  }
 
   if (previous.type === "embed" && draft.type === "embed") {
     if (previous.embedAuthenticationMode !== draft.embedAuthenticationMode) {

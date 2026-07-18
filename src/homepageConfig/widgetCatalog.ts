@@ -3,7 +3,10 @@ import {
   DEFAULT_DASHBOARD_WIDGET_IDS,
   type DashboardWidgetId,
 } from "../components/dashboardWidgets/catalog";
-import { WIDGET_RECOMMENDATION_REASONS } from "../ai/recommendationRationales";
+import {
+  AI_GENERATED_WIDGET_RECOMMENDATIONS,
+  WIDGET_RECOMMENDATION_REASONS,
+} from "../ai/recommendationRationales";
 import type { RecommendedWidget } from "../ai/types";
 import type { HomepageLayout } from "./types";
 
@@ -27,10 +30,19 @@ export function getAvailableWidgetRecommendations(
         : DEFAULT_DASHBOARD_WIDGET_IDS),
   ]);
 
-  return RECOMMENDED_WIDGETS.filter((widget) => !existing.has(widget.id)).map((widget) => ({
-    ...widget,
-    reason: WIDGET_RECOMMENDATION_REASONS[widget.id],
-  }));
+  const libraryWidgets = RECOMMENDED_WIDGETS.filter((widget) => !existing.has(widget.id)).map(
+    (widget) => ({
+      ...widget,
+      reason: WIDGET_RECOMMENDATION_REASONS[widget.id],
+      source: "library" as const,
+    }),
+  );
+
+  const aiGeneratedWidgets = AI_GENERATED_WIDGET_RECOMMENDATIONS.filter(
+    (widget) => !existing.has(widget.id),
+  );
+
+  return [...aiGeneratedWidgets, ...libraryWidgets];
 }
 
 export type { DashboardWidgetId };

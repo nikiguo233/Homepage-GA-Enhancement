@@ -15,7 +15,29 @@ export type HomepageTemplateDraft = {
   dashboardWidgetIds: DashboardWidgetId[];
   customWidgetRefs: string[];
   status: CustomWidgetStatus;
+  previewImageUrl?: string;
 };
+
+export type HomepageTemplate = HomepageTemplateDraft & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function createTemplateId() {
+  return `ht-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function createEmptyTemplateDraft(): HomepageTemplateDraft {
+  return {
+    id: createTemplateId(),
+    name: "",
+    description: "",
+    audience: "",
+    dashboardWidgetIds: [],
+    customWidgetRefs: [],
+    status: "draft",
+  };
+}
 
 export const TEMPLATE_PREVIEW_TOP_ACCOUNTS_WIDGET_ID = "preview-top-accounts";
 

@@ -8,6 +8,7 @@ import {
   type HomepageTemplateDraft,
 } from "../homepageConfig/teamTemplate";
 import { AiGeneratedDashboard } from "./AiGeneratedDashboard";
+import { AiChatBadge } from "../AiChatPanel";
 
 type TemplateEditorStep = "basic" | "configure";
 
@@ -22,13 +23,17 @@ function isBasicInfoValid(draft: HomepageTemplateDraft) {
 export function HomepageTemplateEditor({
   initialDraft,
   initialStep = "configure",
+  aiChatOpen = false,
   onClose,
+  onOpenAiChat,
   onPublish,
   onSave,
 }: {
   initialDraft: HomepageTemplateDraft;
   initialStep?: TemplateEditorStep;
+  aiChatOpen?: boolean;
   onClose: () => void;
+  onOpenAiChat: () => void;
   onPublish: (draft: HomepageTemplateDraft) => void;
   onSave: (draft: HomepageTemplateDraft) => void;
 }) {
@@ -174,6 +179,9 @@ export function HomepageTemplateEditor({
           </div>
         </div>
       )}
+      {!aiChatOpen ? (
+        <AiChatBadge className="homepage-template-editor-ai-badge" onClick={onOpenAiChat} />
+      ) : null}
     </div>
   );
 }

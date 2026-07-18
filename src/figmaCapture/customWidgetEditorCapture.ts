@@ -25,6 +25,7 @@ function buildConfigureDraft(type: "html" | "embed"): CustomWidgetDraft {
     description: CAPTURE_WIDGET_DESCRIPTION,
     size: "6x4" as CustomWidgetSize,
     supportedSizes: ["3x2", "3x3", "6x3", "6x4"] as CustomWidgetSize[],
+    access: "private" as const,
     displayWidgetName: true,
     labelAsExternalContent: type === "embed",
     ...createDefaultEmbedConfig(),

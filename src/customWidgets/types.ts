@@ -1,10 +1,12 @@
 export type CustomWidgetType = "html" | "embed";
 export type CustomWidgetStatus = "draft" | "published";
+export type CustomWidgetAccess = "private" | "tenant";
 export type PresetCustomWidgetSize = "3x2" | "3x3" | "6x3" | "6x4";
 export type CustomWidgetSize = PresetCustomWidgetSize | `${number}x${number}`;
 
 export type EmbedAuthenticationMode = "shared-credentials" | "user-login-required";
 export type EmbedAuthenticationType = "" | "oauth2" | "api-key" | "basic" | "saml";
+export type EmbedSource = "" | "salesforce" | "tableau" | "powerbi";
 
 export type EmbedCredentials = {
   credential1: string;
@@ -33,12 +35,15 @@ export type CustomWidget = {
   content: string;
   size: CustomWidgetSize;
   supportedSizes: CustomWidgetSize[];
+  access: CustomWidgetAccess;
   labelAsExternalContent: boolean;
   displayWidgetName: boolean;
+  embedSource: EmbedSource;
   embedAuthenticationMode: EmbedAuthenticationMode;
   embedAuthenticationType: EmbedAuthenticationType;
   embedCredentials: EmbedCredentials;
   dataBinding?: WidgetDataBinding;
+  isAiGenerated?: boolean;
   status: CustomWidgetStatus;
   createdAt: string;
   updatedAt: string;

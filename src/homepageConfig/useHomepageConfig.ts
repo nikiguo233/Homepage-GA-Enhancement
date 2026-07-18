@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
+import type { AiGeneratedDashboardVariant } from "../ai/types";
 import type { HomepageCleanupPlan } from "./homepageCleanup";
 import type { HomepageLayout } from "./types";
 
@@ -17,10 +18,17 @@ export function useHomepageConfig() {
   const [removedWidgetIds, setRemovedWidgetIds] = useState<DashboardWidgetId[]>([]);
   const [hiddenMetricCardLabels, setHiddenMetricCardLabels] = useState<string[]>([]);
   const [cleanupSnapshot, setCleanupSnapshot] = useState<CleanupSnapshot | null>(null);
+  const [aiDashboardVariant, setAiDashboardVariant] = useState<AiGeneratedDashboardVariant>("default");
+  const [aiLibraryWidgetIds, setAiLibraryWidgetIds] = useState<DashboardWidgetId[]>([]);
 
-  const applyAiGeneratedLayout = useCallback(() => {
-    setLayout("ai-generated");
-  }, []);
+  const applyAiGeneratedLayout = useCallback(
+    (options?: { libraryWidgetIds?: DashboardWidgetId[]; variant?: AiGeneratedDashboardVariant }) => {
+      setLayout("ai-generated");
+      setAiDashboardVariant(options?.variant ?? "default");
+      setAiLibraryWidgetIds(options?.libraryWidgetIds ?? []);
+    },
+    [],
+  );
 
   const resetToDefaultLayout = useCallback(() => {
     setLayout("default");
@@ -28,6 +36,8 @@ export function useHomepageConfig() {
     setWidgetOrder(null);
     setRemovedWidgetIds([]);
     setHiddenMetricCardLabels([]);
+    setAiDashboardVariant("default");
+    setAiLibraryWidgetIds([]);
   }, []);
 
   const addWidgets = useCallback((widgetIds: string[]) => {
@@ -72,6 +82,8 @@ export function useHomepageConfig() {
   return {
     addWidgets,
     addedWidgetIds,
+    aiDashboardVariant,
+    aiLibraryWidgetIds,
     applyAiGeneratedLayout,
     applyCleanupPlan,
     hiddenMetricCardLabels,

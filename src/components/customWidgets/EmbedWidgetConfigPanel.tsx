@@ -1,58 +1,82 @@
 import type { EmbedUrlValidation } from "../../customWidgets/embedPolicy";
 import {
   EMBED_AUTHENTICATION_TYPE_OPTIONS,
+  EMBED_SOURCE_OPTIONS,
   getEmbedCredentialFieldLabels,
+  getEmbedUrlPlaceholder,
   type EmbedAuthenticationMode,
   type EmbedAuthenticationType,
   type EmbedCredentials,
+  type EmbedSource,
 } from "../../customWidgets/embedConfig";
 
 export function EmbedWidgetConfigPanel({
   authenticationMode,
   authenticationType,
   credentials,
+  embedSource,
   embedUrl,
   embedValidation,
   isReadOnly,
   onAuthenticationModeChange,
   onAuthenticationTypeChange,
   onCredentialChange,
+  onEmbedSourceChange,
   onEmbedUrlChange,
 }: {
   authenticationMode: EmbedAuthenticationMode;
   authenticationType: EmbedAuthenticationType;
   credentials: EmbedCredentials;
+  embedSource: EmbedSource;
   embedUrl: string;
   embedValidation: EmbedUrlValidation | null;
   isReadOnly: boolean;
   onAuthenticationModeChange: (mode: EmbedAuthenticationMode) => void;
   onAuthenticationTypeChange: (type: EmbedAuthenticationType) => void;
   onCredentialChange: (key: keyof EmbedCredentials, value: string) => void;
+  onEmbedSourceChange: (source: EmbedSource) => void;
   onEmbedUrlChange: (value: string) => void;
 }) {
   const showSharedCredentialFields = authenticationMode === "shared-credentials";
   const credentialLabels = getEmbedCredentialFieldLabels(authenticationType);
   const credentialKeys = ["credential1", "credential2", "credential3", "credential4"] as const;
+  const showEmbedUrlError =
+    embedUrl.trim().length > 0 && Boolean(embedValidation && !embedValidation.valid);
 
   return (
     <div className="custom-widget-embed-config-panel">
       <label className="custom-widget-field">
         <span className="custom-widget-field-label">
+          Source <span className="custom-widget-required">*</span>
+        </span>
+        <select
+          disabled={isReadOnly}
+          onChange={(event) => onEmbedSourceChange(event.target.value as EmbedSource)}
+          value={embedSource}
+        >
+          {EMBED_SOURCE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="custom-widget-field">
+        <span className="custom-widget-field-label">
           Embed URL <span className="custom-widget-required">*</span>
         </span>
         <textarea
-          className={`custom-widget-embed-config-url${
-            embedValidation && !embedValidation.valid ? " is-invalid" : ""
-          }`}
+          className={`custom-widget-embed-config-url${showEmbedUrlError ? " is-invalid" : ""}`}
           disabled={isReadOnly}
           onChange={(event) => onEmbedUrlChange(event.target.value)}
-          placeholder="Input URL"
+          placeholder={getEmbedUrlPlaceholder(embedSource)}
           rows={3}
           spellCheck={false}
           value={embedUrl}
         />
-        {embedValidation && !embedValidation.valid ? (
-          <span className="custom-widget-embed-config-error">{embedValidation.error}</span>
+        {showEmbedUrlError ? (
+          <span className="custom-widget-embed-config-error">{embedValidation?.error}</span>
         ) : null}
       </label>
 

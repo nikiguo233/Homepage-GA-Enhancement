@@ -20,15 +20,18 @@ import type {
   AiChatSuggestionContext,
   AiRecommendation,
   ChatMessage,
+  ChatPreview,
   CustomWidgetProposal,
   HomepageCleanupPlan,
   RecommendedWidget,
   SuggestedAction,
   TeamTemplateProposal,
   ThinkingProcess,
+  WidgetRecommendationSource,
 } from "./ai/types";
 import { AiChatHomepagePreview } from "./components/AiChatHomepagePreview";
 import { AiChatCustomWidgetPreview } from "./components/AiChatCustomWidgetPreview";
+import { WidgetSourceBadge } from "./components/WidgetSourceBadge";
 import { DASHBOARD_WIDGET_CATALOG } from "./components/dashboardWidgets/catalog";
 import aiSparkIconUrl from "./assets/ai-spark.svg";
 import aiSparkTabIconUrl from "./assets/ai-spark-tab.svg";
@@ -85,6 +88,27 @@ function AiChatEmptyState({
   );
 }
 
+function groupItemsBySource<T extends { source?: WidgetRecommendationSource }>(items: T[]) {
+  const hasSources = items.some((item) => item.source);
+
+  if (!hasSources) {
+    return null;
+  }
+
+  const sourceOrder: WidgetRecommendationSource[] = ["ai-generated", "library"];
+
+  return sourceOrder
+    .map((source) => ({
+      items: items.filter((item) => item.source === source),
+      source,
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+function groupRecommendationsBySource(items: AiRecommendation[]) {
+  return groupItemsBySource(items);
+}
+
 function AiChatRecommendationRationales({
   items,
   preview,
@@ -98,10 +122,30 @@ function AiChatRecommendationRationales({
     return null;
   }
 
+  const sourceGroups = groupRecommendationsBySource(items);
+
   return (
     <div className="ai-chat-recommendation-rationales">
       <h4>{title}</h4>
-      {items.length > 0 ? (
+      {sourceGroups ? (
+        <div className="ai-chat-recommendation-source-groups">
+          {sourceGroups.map((group) => (
+            <section className="ai-chat-recommendation-source-group" key={group.source}>
+              <div className="ai-chat-recommendation-source-group-header">
+                <WidgetSourceBadge source={group.source} />
+              </div>
+              <ul className="ai-chat-recommendation-rationale-list">
+                {group.items.map((item) => (
+                  <li className="ai-chat-recommendation-rationale-item" key={item.name}>
+                    <strong>{item.name}</strong>
+                    <p>{item.reason}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      ) : items.length > 0 ? (
         <ul className="ai-chat-recommendation-rationale-list">
           {items.map((item) => (
             <li className="ai-chat-recommendation-rationale-item" key={item.name}>
@@ -130,6 +174,7 @@ function AiChatWidgetRecommendations({
   const appliedSet = new Set(appliedWidgetIds);
   const selectableWidgets = widgets.filter((widget) => !appliedSet.has(widget.id));
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const sourceGroups = groupItemsBySource(widgets);
 
   useEffect(() => {
     setSelectedIds((current) => current.filter((id) => !appliedWidgetIds.includes(id)));
@@ -152,35 +197,48 @@ function AiChatWidgetRecommendations({
     return null;
   }
 
+  const renderWidgetItem = (widget: RecommendedWidget) => {
+    const isApplied = appliedSet.has(widget.id);
+    const isSelected = selectedIds.includes(widget.id);
+
+    return (
+      <li className="ai-chat-widget-item" key={widget.id}>
+        <label className={`ai-chat-widget-option${isApplied ? " is-applied" : ""}`}>
+          <input
+            checked={isApplied || isSelected}
+            disabled={isApplied}
+            onChange={() => toggleWidget(widget.id)}
+            type="checkbox"
+          />
+          <span className="ai-chat-widget-option-copy">
+            <strong>{widget.name}</strong>
+            <span>{widget.description}</span>
+            <span className="ai-chat-recommendation-reason">
+              <strong>Why:</strong> {widget.reason}
+            </span>
+          </span>
+          {isApplied ? <span className="ai-chat-widget-added-badge">Added</span> : null}
+        </label>
+      </li>
+    );
+  };
+
   return (
     <div className="ai-chat-widget-recommendations">
-      <ul className="ai-chat-widget-list">
-        {widgets.map((widget) => {
-          const isApplied = appliedSet.has(widget.id);
-          const isSelected = selectedIds.includes(widget.id);
-
-          return (
-            <li className="ai-chat-widget-item" key={widget.id}>
-              <label className={`ai-chat-widget-option${isApplied ? " is-applied" : ""}`}>
-                <input
-                  checked={isApplied || isSelected}
-                  disabled={isApplied}
-                  onChange={() => toggleWidget(widget.id)}
-                  type="checkbox"
-                />
-                <span className="ai-chat-widget-option-copy">
-                  <strong>{widget.name}</strong>
-                  <span>{widget.description}</span>
-                  <span className="ai-chat-recommendation-reason">
-                    <strong>Why:</strong> {widget.reason}
-                  </span>
-                </span>
-                {isApplied ? <span className="ai-chat-widget-added-badge">Added</span> : null}
-              </label>
-            </li>
-          );
-        })}
-      </ul>
+      {sourceGroups ? (
+        <div className="ai-chat-widget-source-groups">
+          {sourceGroups.map((group) => (
+            <section className="ai-chat-recommendation-source-group" key={group.source}>
+              <div className="ai-chat-recommendation-source-group-header">
+                <WidgetSourceBadge source={group.source} />
+              </div>
+              <ul className="ai-chat-widget-list">{group.items.map(renderWidgetItem)}</ul>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <ul className="ai-chat-widget-list">{widgets.map(renderWidgetItem)}</ul>
+      )}
       <button
         className="ai-chat-widget-add-button"
         disabled={selectedIds.length === 0}
@@ -273,17 +331,19 @@ function AiChatCleanupProposal({
 }
 
 function AiChatCustomWidgetProposal({
-  addedToHomepage = false,
   messageId,
-  onAddToHomepage,
-  onEditWidget,
+  onSaveWidget,
+  onViewWidget,
   proposal,
+  saved = false,
+  savedWidgetId,
 }: {
-  addedToHomepage?: boolean;
   messageId: string;
-  onAddToHomepage?: (messageId: string, proposal: CustomWidgetProposal) => void;
-  onEditWidget?: (messageId: string, proposal: CustomWidgetProposal) => void;
+  onSaveWidget?: (messageId: string, proposal: CustomWidgetProposal) => void;
+  onViewWidget?: (widgetId: string) => void;
   proposal: CustomWidgetProposal;
+  saved?: boolean;
+  savedWidgetId?: string;
 }) {
   return (
     <div className="ai-chat-assistant-proposal">
@@ -298,27 +358,31 @@ function AiChatCustomWidgetProposal({
       />
       {proposal.supportsLiveData ? (
         <div className="ai-chat-assistant-proposal-actions ai-chat-assistant-proposal-actions-stacked">
-          {addedToHomepage ? (
-            <span className="ai-chat-assistant-proposal-status" role="status">
-              <span aria-hidden="true" className="ai-chat-assistant-proposal-status-dot" />
-              Added to homepage
-            </span>
+          {saved ? (
+            <>
+              <span className="ai-chat-assistant-proposal-status" role="status">
+                <span aria-hidden="true" className="ai-chat-assistant-proposal-status-dot" />
+                Added
+              </span>
+              {savedWidgetId ? (
+                <button
+                  className="ai-chat-preview-regenerate"
+                  onClick={() => onViewWidget?.(savedWidgetId)}
+                  type="button"
+                >
+                  View Widget Detail
+                </button>
+              ) : null}
+            </>
           ) : (
             <button
               className="ai-chat-preview-apply"
-              onClick={() => onAddToHomepage?.(messageId, proposal)}
+              onClick={() => onSaveWidget?.(messageId, proposal)}
               type="button"
             >
               Add to Homepage
             </button>
           )}
-          <button
-            className="ai-chat-preview-regenerate"
-            onClick={() => onEditWidget?.(messageId, proposal)}
-            type="button"
-          >
-            Edit Widget
-          </button>
         </div>
       ) : null}
     </div>
@@ -326,17 +390,21 @@ function AiChatCustomWidgetProposal({
 }
 
 function AiChatTeamTemplateProposal({
-  created = false,
   messageId,
-  onCreate,
+  onSaveTemplate,
+  onViewTemplate,
   previewWidgetIds = [],
   proposal,
+  saved = false,
+  savedTemplateId,
 }: {
-  created?: boolean;
   messageId: string;
-  onCreate: (messageId: string, proposal: TeamTemplateProposal) => void;
+  onSaveTemplate?: (messageId: string, proposal: TeamTemplateProposal) => void;
+  onViewTemplate?: (templateId: string) => void;
   previewWidgetIds?: string[];
   proposal: TeamTemplateProposal;
+  saved?: boolean;
+  savedTemplateId?: string;
 }) {
   return (
     <div className="ai-chat-assistant-proposal">
@@ -353,28 +421,30 @@ function AiChatTeamTemplateProposal({
         title="What's included"
       />
       <p className="ai-chat-assistant-proposal-note">{proposal.sharingNote}</p>
-      <div className="ai-chat-assistant-proposal-actions">
-        {created ? (
+      <div className="ai-chat-assistant-proposal-actions ai-chat-assistant-proposal-actions-stacked">
+        {saved ? (
           <>
             <span className="ai-chat-assistant-proposal-status" role="status">
               <span aria-hidden="true" className="ai-chat-assistant-proposal-status-dot" />
-              Opened in editor
+              Saved
             </span>
-            <button
-              className="ai-chat-assistant-action"
-              onClick={() => onCreate(messageId, proposal)}
-              type="button"
-            >
-              Reopen
-            </button>
+            {savedTemplateId ? (
+              <button
+                className="ai-chat-preview-regenerate"
+                onClick={() => onViewTemplate?.(savedTemplateId)}
+                type="button"
+              >
+                View Template Detail
+              </button>
+            ) : null}
           </>
         ) : (
           <button
             className="ai-chat-preview-apply"
-            onClick={() => onCreate(messageId, proposal)}
+            onClick={() => onSaveTemplate?.(messageId, proposal)}
             type="button"
           >
-            Create template
+            Save Template
           </button>
         )}
       </div>
@@ -384,20 +454,27 @@ function AiChatTeamTemplateProposal({
 
 function AiChatPreviewCard({
   messageId,
+  preview,
   previewApplied = false,
   onApply,
   onRegenerate,
   onUndo,
 }: {
   messageId: string;
+  preview?: ChatPreview;
   previewApplied?: boolean;
   onApply: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
   onUndo: (messageId: string) => void;
 }) {
+  const isAiGeneratedHomepage = preview?.kind === "ai-generated-homepage";
+
   return (
     <div className="ai-chat-preview-card" data-node-id="225:41340">
-      <AiChatHomepagePreview />
+      <AiChatHomepagePreview
+        libraryWidgetIds={isAiGeneratedHomepage ? preview.libraryWidgetIds : undefined}
+        variant={isAiGeneratedHomepage ? preview.variant : undefined}
+      />
       <div className="ai-chat-preview-actions">
         {previewApplied ? (
           <Tooltip title="Revert to your previous homepage configuration.">
@@ -498,27 +575,29 @@ function AiChatThinkingProcess({ thinkingProcess }: { thinkingProcess: ThinkingP
 
 function AiChatMessageList({
   messages,
-  onAddProposedCustomWidgetToHomepage,
   onAddRecommendedWidgets,
   onApplyCleanup,
   onApplyPreview,
-  onCreateProposedTeamTemplate,
-  onCreateWithLiveData,
   onRegeneratePreview,
+  onSaveProposedCustomWidget,
+  onSaveProposedTeamTemplate,
   onUndoCleanup,
   onUndoPreview,
+  onViewSavedCustomWidget,
+  onViewSavedTemplate,
   thinkingProcess,
 }: {
   messages: ChatMessage[];
-  onAddProposedCustomWidgetToHomepage: (messageId: string, proposal: CustomWidgetProposal) => void;
   onAddRecommendedWidgets: (messageId: string, widgetIds: string[]) => void;
   onApplyCleanup: (messageId: string, plan: HomepageCleanupPlan) => void;
   onApplyPreview: (messageId: string) => void;
-  onCreateProposedTeamTemplate: (messageId: string, proposal: TeamTemplateProposal) => void;
-  onCreateWithLiveData: (messageId: string, proposal: CustomWidgetProposal) => void;
   onRegeneratePreview: (messageId: string) => void;
+  onSaveProposedCustomWidget: (messageId: string, proposal: CustomWidgetProposal) => void;
+  onSaveProposedTeamTemplate: (messageId: string, proposal: TeamTemplateProposal) => void;
   onUndoCleanup: (messageId: string) => void;
   onUndoPreview: (messageId: string) => void;
+  onViewSavedCustomWidget?: (widgetId: string) => void;
+  onViewSavedTemplate?: (templateId: string) => void;
   thinkingProcess: ThinkingProcess | null;
 }) {
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -559,22 +638,25 @@ function AiChatMessageList({
           ) : null}
           {message.customWidgetProposal ? (
             <AiChatCustomWidgetProposal
-              addedToHomepage={message.liveDataWidgetAdded}
               messageId={message.id}
-              onAddToHomepage={onAddProposedCustomWidgetToHomepage}
-              onEditWidget={onCreateWithLiveData}
+              onSaveWidget={onSaveProposedCustomWidget}
+              onViewWidget={onViewSavedCustomWidget}
               proposal={message.customWidgetProposal}
+              saved={message.customWidgetSaved}
+              savedWidgetId={message.proposedCustomWidgetId}
             />
           ) : null}
           {message.teamTemplateProposal ? (
             <AiChatTeamTemplateProposal
-              created={message.teamTemplateCreated}
               messageId={message.id}
-              onCreate={onCreateProposedTeamTemplate}
+              onSaveTemplate={onSaveProposedTeamTemplate}
+              onViewTemplate={onViewSavedTemplate}
               previewWidgetIds={
                 message.preview?.kind === "team-template" ? message.preview.widgetIds : []
               }
               proposal={message.teamTemplateProposal}
+              saved={message.teamTemplateSaved}
+              savedTemplateId={message.proposedTemplateId}
             />
           ) : null}
           {message.preview?.kind === "ai-generated-homepage" ? (
@@ -584,6 +666,7 @@ function AiChatMessageList({
                 onApply={onApplyPreview}
                 onRegenerate={onRegeneratePreview}
                 onUndo={onUndoPreview}
+                preview={message.preview}
                 previewApplied={message.previewApplied}
               />
               <AiChatRecommendationRationales
@@ -603,11 +686,17 @@ function AiChatMessageList({
   );
 }
 
-export function AiChatBadge({ onClick }: { onClick: () => void }) {
+export function AiChatBadge({
+  className,
+  onClick,
+}: {
+  className?: string;
+  onClick: () => void;
+}) {
   return (
     <button
       aria-label="Open Zuora AI chat"
-      className="ai-chat-badge"
+      className={["ai-chat-badge", className].filter(Boolean).join(" ")}
       data-node-id="174:20460"
       onClick={onClick}
       type="button"
@@ -620,53 +709,62 @@ export function AiChatBadge({ onClick }: { onClick: () => void }) {
 export function AiChatPanel({
   isThinking = false,
   messages = [],
-  onAddProposedCustomWidgetToHomepage,
   onAddRecommendedWidgets,
   onApplyCleanup,
   onApplyPreview,
   onClose,
-  onCreateProposedTeamTemplate,
-  onCreateWithLiveData,
   onNewChat,
   onRegeneratePreview,
+  onSaveProposedCustomWidget,
+  onSaveProposedTeamTemplate,
+  inputMessage = "",
+  onInputMessageChange,
   onSendMessage,
   onSuggestedAction,
   onUndoCleanup,
   onUndoPreview,
+  onViewSavedCustomWidget,
+  onViewSavedTemplate,
   open,
+  showEmptyStateSuggestions = true,
   suggestionContext = "homepage",
   suggestions = HOMEPAGE_CONFIG_SUGGESTIONS,
   thinkingProcess = null,
 }: {
+  inputMessage?: string;
   isThinking?: boolean;
   messages?: ChatMessage[];
-  onAddProposedCustomWidgetToHomepage?: (messageId: string, proposal: CustomWidgetProposal) => void;
   onAddRecommendedWidgets?: (messageId: string, widgetIds: string[]) => void;
   onApplyCleanup?: (messageId: string, plan: HomepageCleanupPlan) => void;
   onApplyPreview?: (messageId: string) => void;
   onClose: () => void;
-  onCreateProposedTeamTemplate?: (messageId: string, proposal: TeamTemplateProposal) => void;
-  onCreateWithLiveData?: (messageId: string, proposal: CustomWidgetProposal) => void;
+  onInputMessageChange?: (value: string) => void;
   onNewChat?: () => void;
   onRegeneratePreview?: (messageId: string) => void;
+  onSaveProposedCustomWidget?: (messageId: string, proposal: CustomWidgetProposal) => void;
+  onSaveProposedTeamTemplate?: (messageId: string, proposal: TeamTemplateProposal) => void;
   onSendMessage?: (text: string) => void;
   onSuggestedAction?: (action: SuggestedAction) => void;
   onUndoCleanup?: (messageId: string) => void;
   onUndoPreview?: (messageId: string) => void;
+  onViewSavedCustomWidget?: (widgetId: string) => void;
+  onViewSavedTemplate?: (templateId: string) => void;
   open: boolean;
+  showEmptyStateSuggestions?: boolean;
   suggestionContext?: AiChatSuggestionContext;
   suggestions?: SuggestedAction[];
   thinkingProcess?: ThinkingProcess | null;
 }) {
-  const [message, setMessage] = useState("");
   const panelTitleId = useId();
   const chatPanelId = useId();
   const showEmptyState = messages.length === 0 && !isThinking;
-  const canSend = message.trim().length > 0 && !isThinking;
+  const canSend = inputMessage.trim().length > 0 && !isThinking;
   const emptyStateIntro =
     suggestionContext === "custom-widget"
       ? "What kind of custom widget would you like to create?"
-      : "How can I help you today?";
+      : suggestionContext === "template"
+        ? "What kind of homepage template would you like to create?"
+        : "How can I help you today?";
 
   useEffect(() => {
     if (!open) {
@@ -687,14 +785,13 @@ export function AiChatPanel({
   }, [onClose, open]);
 
   const handleSend = () => {
-    const trimmed = message.trim();
+    const trimmed = inputMessage.trim();
 
     if (!trimmed || isThinking) {
       return;
     }
 
     onSendMessage?.(trimmed);
-    setMessage("");
   };
 
   const handleInputKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -712,7 +809,13 @@ export function AiChatPanel({
     <aside
       aria-labelledby={panelTitleId}
       className="ai-chat-panel"
-      data-ai-chat-mode={suggestionContext === "custom-widget" ? "custom-widget" : "homepage-config"}
+      data-ai-chat-mode={
+        suggestionContext === "custom-widget"
+          ? "custom-widget"
+          : suggestionContext === "template"
+            ? "template"
+            : "homepage-config"
+      }
       data-node-id="174:27875"
       id={chatPanelId}
     >
@@ -744,35 +847,34 @@ export function AiChatPanel({
             </header>
 
             <div className="ai-chat-panel-body">
-              {showEmptyState ? (
+              {showEmptyState && showEmptyStateSuggestions ? (
                 <AiChatEmptyState
                   intro={emptyStateIntro}
                   onSelectSuggestion={(action) => onSuggestedAction?.(action)}
                   suggestions={suggestions}
                 />
-              ) : (
+              ) : !showEmptyState ? (
                 <AiChatMessageList
                   messages={messages}
-                  onAddProposedCustomWidgetToHomepage={(messageId, proposal) =>
-                    onAddProposedCustomWidgetToHomepage?.(messageId, proposal)
-                  }
                   onAddRecommendedWidgets={(messageId, widgetIds) =>
                     onAddRecommendedWidgets?.(messageId, widgetIds)
                   }
                   onApplyCleanup={(messageId, plan) => onApplyCleanup?.(messageId, plan)}
                   onApplyPreview={(messageId) => onApplyPreview?.(messageId)}
-                  onCreateProposedTeamTemplate={(messageId, proposal) =>
-                    onCreateProposedTeamTemplate?.(messageId, proposal)
-                  }
-                  onCreateWithLiveData={(messageId, proposal) =>
-                    onCreateWithLiveData?.(messageId, proposal)
-                  }
                   onRegeneratePreview={(messageId) => onRegeneratePreview?.(messageId)}
+                  onSaveProposedCustomWidget={(messageId, proposal) =>
+                    onSaveProposedCustomWidget?.(messageId, proposal)
+                  }
+                  onSaveProposedTeamTemplate={(messageId, proposal) =>
+                    onSaveProposedTeamTemplate?.(messageId, proposal)
+                  }
                   onUndoCleanup={(messageId) => onUndoCleanup?.(messageId)}
                   onUndoPreview={(messageId) => onUndoPreview?.(messageId)}
+                  onViewSavedCustomWidget={onViewSavedCustomWidget}
+                  onViewSavedTemplate={onViewSavedTemplate}
                   thinkingProcess={thinkingProcess}
                 />
-              )}
+              ) : null}
             </div>
 
             <footer className="ai-chat-input-region">
@@ -781,11 +883,11 @@ export function AiChatPanel({
                   <textarea
                     aria-label="Ask Zuora AI"
                     className="ai-chat-input"
-                    onChange={(event) => setMessage(event.target.value)}
+                    onChange={(event) => onInputMessageChange?.(event.target.value)}
                     onKeyDown={handleInputKeyDown}
                     placeholder="Ask Zuora AI"
                     rows={3}
-                    value={message}
+                    value={inputMessage}
                   />
                   <div className="ai-chat-input-actions">
                     <button aria-label="Add attachment" className="ai-chat-icon-button" type="button">
