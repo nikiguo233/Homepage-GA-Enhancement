@@ -21,13 +21,14 @@ import {
   getHistoryActionLabel,
 } from "../../customWidgets/widgetHistory";
 import { ENABLE_CUSTOM_WIDGET_HISTORY_TAB } from "../../customWidgets/featureFlags";
+import { getWidgetGridPreviewSize } from "../../customWidgets/aiGeneratedMetricWidgets";
 import { AiButton } from "../AiButton";
 import { ManagementBreadcrumbs } from "./ManagementBreadcrumbs";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 import { AiGeneratedChip } from "./AiGeneratedChip";
 import { DeleteConfirmModal, ClearHistoryConfirmModal } from "./CustomWidgetDashboardCard";
 
-export type ManageCustomWidgetsTab = "published" | "drafts" | "history";
+export type ManageCustomWidgetsTab = "published" | "private" | "history";
 
 const historyHeaderCellSx = {
   color: "#575e63",
@@ -52,7 +53,6 @@ function getHistoryActionChipSx(action: CustomWidgetHistoryAction) {
 
 export function ManageCustomWidgetsPage({
   activeTab,
-  draftWidgets,
   historyEntries,
   onAddToHomepage,
   onClearHistory,
@@ -63,11 +63,11 @@ export function ManageCustomWidgetsPage({
   onGoHome,
   onGoHub,
   onTabChange,
+  privateWidgets,
   publishedWidgets,
   widgets,
 }: {
   activeTab: ManageCustomWidgetsTab;
-  draftWidgets: CustomWidget[];
   historyEntries: CustomWidgetHistoryEntry[];
   onAddToHomepage: (widgetId: string) => void;
   onClearHistory: () => void;
@@ -78,6 +78,7 @@ export function ManageCustomWidgetsPage({
   onGoHome: () => void;
   onGoHub: () => void;
   onTabChange: (tab: ManageCustomWidgetsTab) => void;
+  privateWidgets: CustomWidget[];
   publishedWidgets: CustomWidget[];
   widgets: CustomWidget[];
 }) {
@@ -85,8 +86,13 @@ export function ManageCustomWidgetsPage({
   const [isClearHistoryOpen, setIsClearHistoryOpen] = useState(false);
   const resolvedActiveTab =
     !ENABLE_CUSTOM_WIDGET_HISTORY_TAB && activeTab === "history" ? "published" : activeTab;
-  const visibleWidgets = resolvedActiveTab === "published" ? publishedWidgets : draftWidgets;
-  const isWidgetTab = resolvedActiveTab === "published" || resolvedActiveTab === "drafts";
+  const visibleWidgets =
+    resolvedActiveTab === "published"
+      ? publishedWidgets
+      : resolvedActiveTab === "private"
+        ? privateWidgets
+        : [];
+  const isWidgetTab = resolvedActiveTab === "published" || resolvedActiveTab === "private";
   const isEmpty = isWidgetTab && visibleWidgets.length === 0;
   const isHistoryEmpty =
     ENABLE_CUSTOM_WIDGET_HISTORY_TAB &&
@@ -111,7 +117,7 @@ export function ManageCustomWidgetsPage({
             Create with AI
           </AiButton>
           <button className="custom-widget-primary-button" onClick={onCreateWidget} type="button">
-            Create Custom Widget
+            Create Widget
           </button>
         </div>
       </div>
@@ -123,16 +129,16 @@ export function ManageCustomWidgetsPage({
           role="tab"
           type="button"
         >
-          Published
+          Shared
         </button>
         <button
-          aria-selected={resolvedActiveTab === "drafts"}
-          className={`custom-widget-tab${resolvedActiveTab === "drafts" ? " is-active" : ""}`}
-          onClick={() => onTabChange("drafts")}
+          aria-selected={resolvedActiveTab === "private"}
+          className={`custom-widget-tab${resolvedActiveTab === "private" ? " is-active" : ""}`}
+          onClick={() => onTabChange("private")}
           role="tab"
           type="button"
         >
-          Drafts
+          Personal
         </button>
         {ENABLE_CUSTOM_WIDGET_HISTORY_TAB ? (
           <button
@@ -167,10 +173,18 @@ export function ManageCustomWidgetsPage({
       ) : null}
       {isWidgetTab && !isEmpty ? (
         <div className="custom-widget-grid">
-          {visibleWidgets.map((widget) => (
+          {visibleWidgets.map((widget) => {
+            const previewSize = getWidgetGridPreviewSize(widget);
+
+            return (
             <article className="custom-widget-grid-card" key={widget.id}>
               <div className="custom-widget-grid-preview">
-                <CustomWidgetPreviewFrame compact size={widget.size} widget={widget} />
+                <CustomWidgetPreviewFrame
+                  compact
+                  fillContainer={previewSize !== "3x1"}
+                  size={previewSize}
+                  widget={widget}
+                />
                 {widget.isAiGenerated ? <AiGeneratedChip /> : null}
                 <div className="custom-widget-grid-card-overlay">
                   <button
@@ -180,28 +194,26 @@ export function ManageCustomWidgetsPage({
                   >
                     View Details
                   </button>
-                  {resolvedActiveTab === "drafts" ? (
-                    <button
-                      className="custom-widget-secondary-button custom-widget-grid-card-action"
-                      onClick={() => setPendingDeleteWidgetId(widget.id)}
-                      type="button"
-                    >
-                      Delete
-                    </button>
-                  ) : (
-                    <button
-                      className="custom-widget-secondary-button custom-widget-grid-card-action"
-                      onClick={() => onAddToHomepage(widget.id)}
-                      type="button"
-                    >
-                      Add to Homepage
-                    </button>
-                  )}
+                  <button
+                    className="custom-widget-secondary-button custom-widget-grid-card-action"
+                    onClick={() => onAddToHomepage(widget.id)}
+                    type="button"
+                  >
+                    Add to Homepage
+                  </button>
+                  <button
+                    className="custom-widget-secondary-button custom-widget-grid-card-action"
+                    onClick={() => setPendingDeleteWidgetId(widget.id)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
               <span className="custom-widget-grid-name">{widget.name || "Untitled Widget"}</span>
             </article>
-          ))}
+            );
+          })}
         </div>
       ) : null}
       {ENABLE_CUSTOM_WIDGET_HISTORY_TAB && resolvedActiveTab === "history" && !isHistoryEmpty ? (

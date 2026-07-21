@@ -20,15 +20,19 @@ type EmbedLoadState = "idle" | "loading" | "ready" | "unavailable";
 export function CustomWidgetPreviewFrame({
   compact = false,
   dense = false,
+  fillContainer = false,
   gridFit = false,
   interactive,
+  scrollable = false,
   size = "3x3",
   widget,
 }: {
   compact?: boolean;
   dense?: boolean;
+  fillContainer?: boolean;
   gridFit?: boolean;
   interactive?: boolean;
+  scrollable?: boolean;
   size?: CustomWidgetSize;
   widget: Pick<
     CustomWidget,
@@ -139,6 +143,7 @@ export function CustomWidgetPreviewFrame({
     "custom-widget-preview-shell",
     compact ? "is-compact" : "",
     dense ? "is-dense" : "",
+    fillContainer ? "is-fill-container" : "",
     gridFit ? "is-grid-fit" : "",
     isInteractive ? "is-interactive" : "",
     isInteractiveEmbed ? "is-interactive-embed" : "",
@@ -149,6 +154,13 @@ export function CustomWidgetPreviewFrame({
   const shellStyle: CSSProperties = gridFit
     ? {
         height: "100%",
+        width: "100%",
+      }
+    : fillContainer
+    ? {
+        height: "100%",
+        maxHeight: "100%",
+        maxWidth: "100%",
         width: "100%",
       }
     : compact
@@ -278,6 +290,7 @@ export function CustomWidgetPreviewFrame({
         srcDoc={buildWidgetPreviewDocument(widget.content, size, compact, {
           dense,
           gridFit,
+          scrollable,
           useLiveData: usesLiveData,
         })}
         style={iframeStyle}

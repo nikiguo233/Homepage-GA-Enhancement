@@ -258,11 +258,12 @@ function getDashboardWidgetName(widgetId: string) {
 function getCleanupLayoutItems(proposal: HomepageCleanupPlan) {
   const layoutItems: string[] = [];
 
-  if (proposal.hiddenMetricCardLabels.length > 0) {
-    ["Active Contracts", "Deferred Revenue", "Compliance Risk", "Close Readiness"]
-      .filter((label) => !proposal.hiddenMetricCardLabels.includes(label))
-      .forEach((label) => layoutItems.push(label));
-    layoutItems.push("Revenue Recognition Trend");
+  if (proposal.metricCardOrder.length > 0) {
+    layoutItems.push(...proposal.metricCardOrder);
+
+    if (!proposal.metricCardOrder.includes("Open Exceptions")) {
+      layoutItems.push("Revenue Recognition Trend");
+    }
   }
 
   layoutItems.push(...proposal.orderedWidgetIds.map(getDashboardWidgetName));
@@ -287,17 +288,19 @@ function AiChatCleanupProposal({
 
   return (
     <div className="ai-chat-cleanup-proposal">
-      <div className="ai-chat-cleanup-section">
-        <h4>Widgets to remove</h4>
-        <ul className="ai-chat-cleanup-list ai-chat-cleanup-removal-list">
-          {proposal.removals.map((removal) => (
-            <li className="ai-chat-cleanup-removal-item" key={removal.id}>
-              <strong>{removal.name}</strong>
-              <p>{removal.reason}</p>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {proposal.removals.length > 0 ? (
+        <div className="ai-chat-cleanup-section">
+          <h4>Moved down to prioritize top metrics</h4>
+          <ul className="ai-chat-cleanup-list ai-chat-cleanup-removal-list">
+            {proposal.removals.map((removal) => (
+              <li className="ai-chat-cleanup-removal-item" key={removal.id}>
+                <strong>{removal.name}</strong>
+                <p>{removal.reason}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="ai-chat-cleanup-section">
         <h4>Updated layout</h4>
         <p className="ai-chat-cleanup-layout-reason">{proposal.layoutReason}</p>

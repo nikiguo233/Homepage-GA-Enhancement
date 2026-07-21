@@ -12,8 +12,8 @@ export const THINKING_STEP_LABELS: Record<ThinkingMode, string[]> = {
   cleanup: [
     "Understanding your request",
     "Reviewing widgets on your homepage",
-    "Identifying low-value widgets",
-    "Planning a cleaner layout",
+    "Identifying your most important metrics",
+    "Planning a layout with top KPIs first",
   ],
   "custom-widget": [
     "Understanding your request",
@@ -100,10 +100,12 @@ function isWidgetRecommendationPrompt(text: string) {
   );
 }
 
-function isHomepageCleanupPrompt(text: string) {
+function isHomepageReorganizePrompt(text: string) {
   const normalized = text.trim().toLowerCase();
 
   return (
+    (normalized.includes("reorganize") && normalized.includes("homepage")) ||
+    (normalized.includes("important metrics") && normalized.includes("top")) ||
     (normalized.includes("clean up") && normalized.includes("homepage")) ||
     normalized.includes("remove low-value widgets")
   );
@@ -142,7 +144,7 @@ function isCollectionsTemplatePrompt(text: string) {
 }
 
 export function getThinkingModeForPrompt(prompt: string): ThinkingMode {
-  if (isHomepageCleanupPrompt(prompt)) {
+  if (isHomepageReorganizePrompt(prompt)) {
     return "cleanup";
   }
 

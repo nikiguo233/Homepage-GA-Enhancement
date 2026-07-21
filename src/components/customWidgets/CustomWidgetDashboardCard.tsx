@@ -1,7 +1,9 @@
 import CloseIcon from "@mui/icons-material/Close";
 import { forwardRef } from "react";
+import type { CSSProperties } from "react";
+import { getWidgetGridPreviewSize } from "../../customWidgets/aiGeneratedMetricWidgets";
 import type { CustomWidget, CustomWidgetSize } from "../../customWidgets/types";
-import { parseWidgetSize } from "../../customWidgets/widgetSizes";
+import { getWidgetDashboardCardHeight, parseWidgetSize } from "../../customWidgets/widgetSizes";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 
 export const CustomWidgetDashboardCard = forwardRef<
@@ -12,7 +14,10 @@ export const CustomWidgetDashboardCard = forwardRef<
     widget: CustomWidget;
   }
 >(function CustomWidgetDashboardCard({ className, displaySize, widget }, ref) {
-  const size = displaySize ?? widget.size;
+  const size = getWidgetGridPreviewSize({
+    ...widget,
+    size: displaySize ?? widget.size,
+  });
   const { cols } = parseWidgetSize(size);
   const cardClassName = [
     "widget-card",
@@ -22,6 +27,9 @@ export const CustomWidgetDashboardCard = forwardRef<
   ]
     .filter(Boolean)
     .join(" ");
+  const cardStyle = {
+    "--custom-widget-dashboard-height": `${getWidgetDashboardCardHeight(size)}px`,
+  } as CSSProperties;
   const previewWidget = {
     ...widget,
     displayWidgetName: false,
@@ -29,7 +37,7 @@ export const CustomWidgetDashboardCard = forwardRef<
   const showCardHeader = widget.type === "embed" && !widget.displayWidgetName;
 
   return (
-    <article className={cardClassName} ref={ref}>
+    <article className={cardClassName} ref={ref} style={cardStyle}>
       <div className="widget-card-inner widget-card-inner-gap-8">
         {showCardHeader ? (
           <header className="custom-widget-dashboard-header">
@@ -37,7 +45,7 @@ export const CustomWidgetDashboardCard = forwardRef<
           </header>
         ) : null}
         <div className="custom-widget-dashboard-preview">
-          <CustomWidgetPreviewFrame interactive size={size} widget={previewWidget} />
+          <CustomWidgetPreviewFrame gridFit scrollable interactive size={size} widget={previewWidget} />
         </div>
       </div>
     </article>
@@ -45,12 +53,21 @@ export const CustomWidgetDashboardCard = forwardRef<
 });
 
 export function PublishConfirmModal({
+  access = "tenant",
+  confirmLabel = "Save and Publish",
   onCancel,
   onConfirm,
 }: {
+  access?: "private" | "tenant";
+  confirmLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const message =
+    access === "private"
+      ? "This widget will be published with private access. It will only be available on your homepage. Are you sure you want to publish?"
+      : "This widget will be published to all users within the current tenant (Tenant ID: 10130). Are you sure you want to publish?";
+
   return (
     <div className="custom-widget-modal-backdrop" role="presentation">
       <div aria-labelledby="publish-modal-title" aria-modal="true" className="custom-widget-modal" role="dialog">
@@ -60,16 +77,13 @@ export function PublishConfirmModal({
             <CloseIcon />
           </button>
         </header>
-        <p className="custom-widget-modal-body">
-          This widget will be published to all users within the current tenant (Tenant ID: 10130). Are you
-          sure you want to publish?
-        </p>
+        <p className="custom-widget-modal-body">{message}</p>
         <footer className="custom-widget-modal-footer">
           <button className="custom-widget-secondary-button" onClick={onCancel} type="button">
             Cancel
           </button>
           <button className="custom-widget-primary-button" onClick={onConfirm} type="button">
-            Publish
+            {confirmLabel}
           </button>
         </footer>
       </div>
@@ -78,12 +92,19 @@ export function PublishConfirmModal({
 }
 
 export function UnpublishConfirmModal({
+  access = "tenant",
   onCancel,
   onConfirm,
 }: {
+  access?: "private" | "tenant";
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const message =
+    access === "private"
+      ? "This widget will be unpublished and moved to Personal. Are you sure you want to unpublish?"
+      : "This widget will be unpublished and removed from all users within the current tenant (Tenant ID: 10130). Are you sure you want to unpublish?";
+
   return (
     <div className="custom-widget-modal-backdrop" role="presentation">
       <div aria-labelledby="unpublish-modal-title" aria-modal="true" className="custom-widget-modal" role="dialog">
@@ -93,10 +114,7 @@ export function UnpublishConfirmModal({
             <CloseIcon />
           </button>
         </header>
-        <p className="custom-widget-modal-body">
-          This widget will be unpublished and removed from all users within the current tenant (Tenant ID:
-          10130). Are you sure you want to unpublish?
-        </p>
+        <p className="custom-widget-modal-body">{message}</p>
         <footer className="custom-widget-modal-footer">
           <button className="custom-widget-secondary-button" onClick={onCancel} type="button">
             Cancel

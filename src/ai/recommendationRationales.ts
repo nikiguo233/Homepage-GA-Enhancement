@@ -96,6 +96,11 @@ export const WIDGET_RECOMMENDATION_REASONS: Record<DashboardWidgetId, string> = 
   "run-report": "Puts your most-used recognition reports one click away.",
 };
 
+export const REORGANIZE_DEPRIORITIZE_REASONS: Record<string, string> = {
+  "Close Readiness": "Moved below top-priority revenue metrics so contract and revenue KPIs stay above the fold.",
+  "Compliance Risk": "Moved below top-priority revenue metrics so contract and revenue KPIs stay above the fold.",
+};
+
 export const CLEANUP_REMOVAL_REASONS: Record<string, string> = {
   "active-batches": "Niche for most revenue roles and adds clutter to the default layout.",
   "Close Readiness": "Overlaps with task-focused widgets that already track close actions.",
@@ -105,8 +110,12 @@ export const CLEANUP_REMOVAL_REASONS: Record<string, string> = {
 };
 
 export const CLEANUP_LAYOUT_REASON =
-  "Reordered to put actionable tasks and summaries ahead of admin utilities.";
+  "Reordered to put the most important metrics and actionable widgets at the top of your homepage.";
 
 export function getCleanupRemovalReason(id: string) {
-  return CLEANUP_REMOVAL_REASONS[id] ?? "Rarely used compared with the widgets that remain on your homepage.";
+  return (
+    REORGANIZE_DEPRIORITIZE_REASONS[id] ??
+    CLEANUP_REMOVAL_REASONS[id] ??
+    "Moved down so higher-priority metrics stay at the top of your homepage."
+  );
 }

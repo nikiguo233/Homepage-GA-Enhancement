@@ -165,6 +165,12 @@ export function getWidgetGridSlotDimensions(
   };
 }
 
+const WIDGET_DASHBOARD_CARD_CHROME = 40;
+
+export function getWidgetDashboardCardHeight(size: CustomWidgetSize) {
+  return getWidgetGridSlotDimensions(size).height + WIDGET_DASHBOARD_CARD_CHROME;
+}
+
 export function clampWidgetGridUnit(value: number) {
   if (!Number.isFinite(value)) {
     return MIN_WIDGET_GRID_UNIT;

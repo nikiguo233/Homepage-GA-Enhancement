@@ -15,6 +15,7 @@ import {
 } from "./thinkingSteps";
 import type {
   AiChatSuggestionContext,
+  AiGeneratedDashboardVariant,
   ChatMessage,
   ChatPreview,
   CustomWidgetProposal,
@@ -66,11 +67,14 @@ async function runThinkingSequence(
 
 export function useAiHomepageConfigChat(options: {
   addedWidgetIds: string[];
+  aiDashboardVariant?: AiGeneratedDashboardVariant;
+  aiLibraryWidgetIds?: DashboardWidgetId[];
   extraExcludedWidgetIds?: string[];
   hiddenMetricCardLabels: string[];
   isAiGenerated: boolean;
   isEmptyHomepage?: boolean;
   layout: HomepageLayout;
+  metricCardOrder: string[] | null;
   onAddWidgets?: (widgetIds: string[]) => void;
   onApplyCleanup?: (plan: HomepageCleanupPlan) => void;
   onApplyPreview?: (preview?: ChatPreview) => void;
@@ -169,11 +173,14 @@ export function useAiHomepageConfigChat(options: {
 
       const response = getHomepageConfigAssistantResponse(prompt, {
         addedWidgetIds: options.addedWidgetIds,
+        aiDashboardVariant: options.aiDashboardVariant,
+        aiLibraryWidgetIds: options.aiLibraryWidgetIds,
         extraExcludedWidgetIds: options.extraExcludedWidgetIds,
         hiddenMetricCardLabels: options.hiddenMetricCardLabels,
         isAiGenerated: options.isAiGenerated,
         isEmptyHomepage: options.isEmptyHomepage,
         layout: options.layout,
+        metricCardOrder: options.metricCardOrder,
         removedWidgetIds: options.removedWidgetIds,
         revenueProgressAdded: options.revenueProgressAdded,
         widgetOrder: options.widgetOrder,
@@ -198,11 +205,14 @@ export function useAiHomepageConfigChat(options: {
     },
     [
       options.addedWidgetIds,
+      options.aiDashboardVariant,
+      options.aiLibraryWidgetIds,
       options.extraExcludedWidgetIds,
       options.hiddenMetricCardLabels,
       options.isAiGenerated,
       options.isEmptyHomepage,
       options.layout,
+      options.metricCardOrder,
       options.removedWidgetIds,
       options.revenueProgressAdded,
       options.widgetOrder,

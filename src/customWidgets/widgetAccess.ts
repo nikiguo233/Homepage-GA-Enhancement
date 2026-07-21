@@ -6,7 +6,7 @@ export const CUSTOM_WIDGET_ACCESS_OPTIONS: {
   label: string;
   value: CustomWidgetAccess;
 }[] = [
-  { value: "private", label: "Private" },
+  { value: "private", label: "Personal" },
   {
     value: "tenant",
     label: `All users in current tenant (${CUSTOM_WIDGET_TENANT_ID})`,
@@ -20,6 +20,16 @@ export function getCustomWidgetAccessLabel(access: CustomWidgetAccess | undefine
   );
 }
 
+export function getCustomWidgetVisibilityChipLabel(access: CustomWidgetAccess | undefined) {
+  return normalizeCustomWidgetAccess(access) === "tenant" ? "Shared" : "Personal";
+}
+
 export function normalizeCustomWidgetAccess(access: unknown): CustomWidgetAccess {
   return access === "tenant" ? "tenant" : "private";
+}
+
+export function getCustomWidgetSavedStatus(
+  access: CustomWidgetAccess | undefined,
+): "draft" | "published" {
+  return normalizeCustomWidgetAccess(access) === "tenant" ? "published" : "draft";
 }

@@ -36,7 +36,8 @@ import { WidgetEditorPreviewGrid } from "./WidgetEditorPreviewGrid";
 import { EmbedWidgetConfigPanel } from "./EmbedWidgetConfigPanel";
 import { CustomWidgetCodeEditor } from "./CustomWidgetCodeEditor";
 import { EditorMoreMenu } from "./HomepageActionsMenu";
-import { PublishConfirmModal, UnpublishConfirmModal, DeleteConfirmModal } from "./CustomWidgetDashboardCard";
+import { DeleteConfirmModal, PublishConfirmModal } from "./CustomWidgetDashboardCard";
+import { AiChatBadge } from "../../AiChatPanel";
 
 type EditorStep = "basic" | "configure";
 
@@ -53,26 +54,26 @@ function isBasicInfoValid(draft: CustomWidgetDraft) {
 }
 
 export function CustomWidgetEditor({
+  aiChatOpen = false,
   initialDraft,
   initialStep = "basic",
   isEditing,
   onAddToHomepage,
   onClose,
   onDelete,
-  onPublish,
+  onOpenAiChat,
   onSave,
-  onUnpublish,
   widgetId,
 }: {
+  aiChatOpen?: boolean;
   initialDraft: CustomWidgetDraft;
   initialStep?: EditorStep;
   isEditing: boolean;
   onAddToHomepage?: (draft: CustomWidgetDraft) => void;
   onClose: () => void;
   onDelete?: () => void;
-  onPublish: (draft: CustomWidgetDraft) => void;
+  onOpenAiChat?: () => void;
   onSave: (draft: CustomWidgetDraft) => void;
-  onUnpublish: (draft: CustomWidgetDraft) => void;
   widgetId: string | null;
 }) {
   const [step, setStep] = useState<EditorStep>(initialStep);
@@ -82,8 +83,7 @@ export function CustomWidgetEditor({
     ...normalizeEmbedConfig(initialDraft),
   }));
   const [showCode, setShowCode] = useState(true);
-  const [showPublishModal, setShowPublishModal] = useState(false);
-  const [showUnpublishModal, setShowUnpublishModal] = useState(false);
+  const [showPublishConfirmModal, setShowPublishConfirmModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -113,20 +113,15 @@ export function CustomWidgetEditor({
       draft.supportedSizes.includes(draft.size),
     [draft],
   );
-  const canPublish = useMemo(
+  const canSave = useMemo(
     () => canAccessConfigure && isEmbedConfigValid(draft),
     [canAccessConfigure, draft],
   );
   const embedConfig = useMemo(() => normalizeEmbedConfig(draft), [draft]);
   const showEmbedPreview =
     draft.type === "embed" && Boolean(embedValidation?.valid) && draft.supportedSizes.length > 0;
-  const isPublished = draft.status === "published";
   const isTenantAccess = draft.access === "tenant";
-  const showPublishButton = isTenantAccess;
-  const showAddToHomepageButton =
-    Boolean(onAddToHomepage) &&
-    ((step === "configure" && !isPublished && !isTenantAccess) ||
-      (isPublished && isTenantAccess));
+  const showAddToHomepageButton = Boolean(onAddToHomepage);
   const customSupportedSize = getCustomSupportedSize(draft.supportedSizes);
   const isCustomSizeEnabled = Boolean(customSupportedSize);
   const customSizeDimensions = customSupportedSize
@@ -181,35 +176,22 @@ export function CustomWidgetEditor({
   };
 
   const handleSave = () => {
-    onSave({ ...draft, status: draft.status ?? "draft" });
+    if (isTenantAccess) {
+      setShowPublishConfirmModal(true);
+      return;
+    }
+
+    onSave(draft);
   };
 
-  const handlePublish = () => {
-    onPublish({ ...draft, status: "published" });
-    setShowPublishModal(false);
-  };
-
-  const handleUnpublish = () => {
-    onUnpublish({ ...draft, status: "draft" });
-    setShowUnpublishModal(false);
+  const handleConfirmSaveAndPublish = () => {
+    onSave(draft);
+    setShowPublishConfirmModal(false);
   };
 
   const handleDelete = () => {
     onDelete?.();
     setShowDeleteModal(false);
-  };
-
-  const handlePrimaryAction = () => {
-    if (!isTenantAccess) {
-      return;
-    }
-
-    if (isPublished) {
-      setShowUnpublishModal(true);
-      return;
-    }
-
-    setShowPublishModal(true);
   };
 
   const handleAddToHomepageClick = () => {
@@ -231,10 +213,6 @@ export function CustomWidgetEditor({
   };
 
   const handleToggleSupportedSize = (size: CustomWidgetSize) => {
-    if (isPublished) {
-      return;
-    }
-
     setDraft((current) => {
       const isSelected = current.supportedSizes.includes(size);
 
@@ -257,10 +235,6 @@ export function CustomWidgetEditor({
   };
 
   const handleToggleCustomSize = () => {
-    if (isPublished) {
-      return;
-    }
-
     setDraft((current) => {
       const existingCustomSize = getCustomSupportedSize(current.supportedSizes);
 
@@ -286,10 +260,6 @@ export function CustomWidgetEditor({
   };
 
   const handleCustomSizeChange = (cols: number, rows: number) => {
-    if (isPublished) {
-      return;
-    }
-
     const nextCols = clampWidgetGridUnit(cols);
     const nextRows = clampWidgetGridUnit(rows);
     const nextCustomSize = formatWidgetSize(nextCols, nextRows);
@@ -371,9 +341,9 @@ export function CustomWidgetEditor({
           <div className="custom-widget-editor-title-group">
             <span className="custom-widget-editor-title">Custom Widget</span>
             <span
-              className={`custom-widget-editor-status-chip${isPublished ? " is-published" : ""}`}
+              className={`custom-widget-editor-status-chip${isTenantAccess ? " is-published" : ""}`}
             >
-              {isPublished ? "Published" : "draft"}
+              {isTenantAccess ? "Shared" : "Personal"}
             </span>
           </div>
         </div>
@@ -395,16 +365,6 @@ export function CustomWidgetEditor({
           </button>
         </nav>
         <div className="custom-widget-editor-header-actions">
-          {!isPublished ? (
-            <button
-              className="custom-widget-editor-secondary-button"
-              disabled={!canPublish}
-              onClick={handleSave}
-              type="button"
-            >
-              Save
-            </button>
-          ) : null}
           {showAddToHomepageButton ? (
             <button
               className="custom-widget-editor-secondary-button"
@@ -415,16 +375,14 @@ export function CustomWidgetEditor({
               Add to Homepage
             </button>
           ) : null}
-          {showPublishButton ? (
-            <button
-              className="custom-widget-editor-primary-button"
-              disabled={!canPublish}
-              onClick={handlePrimaryAction}
-              type="button"
-            >
-              {isPublished ? "Unpublish" : "Publish"}
-            </button>
-          ) : null}
+          <button
+            className="custom-widget-editor-primary-button"
+            disabled={!canSave}
+            onClick={handleSave}
+            type="button"
+          >
+            {isTenantAccess ? "Save and Publish" : "Save"}
+          </button>
           <div className="custom-widget-editor-more">
             <button
               aria-label="More actions"
@@ -461,7 +419,6 @@ export function CustomWidgetEditor({
               <div className="custom-widget-type-grid">
                 <button
                   className={`custom-widget-type-card${draft.type === "html" ? " is-selected" : ""}`}
-                  disabled={isPublished}
                   onClick={() => handleTypeChange("html")}
                   type="button"
                 >
@@ -475,7 +432,6 @@ export function CustomWidgetEditor({
                 </button>
                 <button
                   className={`custom-widget-type-card${draft.type === "embed" ? " is-selected" : ""}`}
-                  disabled={isPublished}
                   onClick={() => handleTypeChange("embed")}
                   type="button"
                 >
@@ -494,7 +450,6 @@ export function CustomWidgetEditor({
                 Widget Name <span className="custom-widget-required">*</span>
               </span>
               <input
-                disabled={isPublished}
                 onChange={(event) => updateDraft({ name: event.target.value })}
                 placeholder="Input name"
                 value={draft.name}
@@ -505,7 +460,6 @@ export function CustomWidgetEditor({
                 Description <span className="custom-widget-required">*</span>
               </span>
               <textarea
-                disabled={isPublished}
                 maxLength={MAX_DESCRIPTION_LENGTH}
                 onChange={(event) => updateDraft({ description: event.target.value })}
                 placeholder="Input description of the widget"
@@ -520,7 +474,6 @@ export function CustomWidgetEditor({
               <label className="custom-widget-checkbox-field">
                 <input
                   checked={draft.labelAsExternalContent}
-                  disabled={isPublished}
                   onChange={(event) => updateDraft({ labelAsExternalContent: event.target.checked })}
                   type="checkbox"
                 />
@@ -529,10 +482,9 @@ export function CustomWidgetEditor({
             ) : null}
             <label className="custom-widget-field">
               <span className="custom-widget-field-label">
-                Access <span className="custom-widget-required">*</span>
+                Visibility <span className="custom-widget-required">*</span>
               </span>
               <select
-                disabled={isPublished}
                 onChange={(event) =>
                   updateDraft({
                     access: event.target.value as CustomWidgetDraft["access"],
@@ -593,7 +545,7 @@ export function CustomWidgetEditor({
                     <label className="custom-widget-supported-size-option" key={size}>
                       <input
                         checked={isChecked}
-                        disabled={isPublished || (isChecked && draft.supportedSizes.length === 1)}
+                  disabled={isChecked && draft.supportedSizes.length === 1}
                         onChange={() => handleToggleSupportedSize(size)}
                         type="checkbox"
                       />
@@ -604,7 +556,7 @@ export function CustomWidgetEditor({
                 <label className="custom-widget-supported-size-option">
                   <input
                     checked={isCustomSizeEnabled}
-                    disabled={isPublished || (isCustomSizeEnabled && draft.supportedSizes.length === 1)}
+                    disabled={isCustomSizeEnabled && draft.supportedSizes.length === 1}
                     onChange={handleToggleCustomSize}
                     type="checkbox"
                   />
@@ -614,7 +566,7 @@ export function CustomWidgetEditor({
                   <input
                     aria-label="Custom widget width"
                     className="custom-widget-custom-size-input"
-                    disabled={isPublished || !isCustomSizeEnabled}
+                    disabled={!isCustomSizeEnabled}
                     max={MAX_WIDGET_GRID_UNIT}
                     min={MIN_WIDGET_GRID_UNIT}
                     onChange={(event) =>
@@ -627,7 +579,7 @@ export function CustomWidgetEditor({
                   <input
                     aria-label="Custom widget height"
                     className="custom-widget-custom-size-input"
-                    disabled={isPublished || !isCustomSizeEnabled}
+                    disabled={!isCustomSizeEnabled}
                     max={MAX_WIDGET_GRID_UNIT}
                     min={MIN_WIDGET_GRID_UNIT}
                     onChange={(event) =>
@@ -670,7 +622,6 @@ export function CustomWidgetEditor({
                       </div>
                       <CustomWidgetCodeEditor
                         onChange={(content) => updateDraft({ content })}
-                        readOnly={isPublished}
                         value={draft.content}
                       />
                     </>
@@ -682,7 +633,7 @@ export function CustomWidgetEditor({
                       embedSource={embedConfig.embedSource}
                       embedUrl={draft.content}
                       embedValidation={embedValidation}
-                      isReadOnly={isPublished}
+                      isReadOnly={false}
                       onAuthenticationModeChange={(embedAuthenticationMode) =>
                         updateDraft({ embedAuthenticationMode })
                       }
@@ -719,7 +670,6 @@ export function CustomWidgetEditor({
                 <label className="custom-widget-size-field">
                   <span>Widget Size</span>
                   <select
-                    disabled={isPublished}
                     onChange={(event) =>
                       handlePreviewSizeChange(event.target.value as CustomWidgetSize)
                     }
@@ -749,13 +699,11 @@ export function CustomWidgetEditor({
         </div>
       )}
 
-      {showPublishModal ? (
-        <PublishConfirmModal onCancel={() => setShowPublishModal(false)} onConfirm={handlePublish} />
-      ) : null}
-      {showUnpublishModal ? (
-        <UnpublishConfirmModal
-          onCancel={() => setShowUnpublishModal(false)}
-          onConfirm={handleUnpublish}
+      {showPublishConfirmModal ? (
+        <PublishConfirmModal
+          access={draft.access}
+          onCancel={() => setShowPublishConfirmModal(false)}
+          onConfirm={handleConfirmSaveAndPublish}
         />
       ) : null}
       {showDeleteModal ? (
@@ -764,6 +712,9 @@ export function CustomWidgetEditor({
           onConfirm={handleDelete}
           widgetName={draft.name}
         />
+      ) : null}
+      {step === "configure" && !aiChatOpen && onOpenAiChat ? (
+        <AiChatBadge className="custom-widget-editor-ai-badge" onClick={onOpenAiChat} />
       ) : null}
     </div>
   );

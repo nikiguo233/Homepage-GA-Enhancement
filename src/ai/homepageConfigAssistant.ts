@@ -2,6 +2,7 @@ import { proposeHomepageCleanup } from "../homepageConfig/homepageCleanup";
 import { getAvailableWidgetRecommendations } from "../homepageConfig/widgetCatalog";
 import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
 import type { HomepageLayout } from "../homepageConfig/types";
+import type { AiGeneratedDashboardVariant } from "./types";
 import {
   COLLECTIONS_TEAM_TEMPLATE_PROPOSAL,
   FINANCE_LEADERSHIP_TEAM_TEMPLATE_PROPOSAL,
@@ -34,9 +35,9 @@ export const HOMEPAGE_CONFIG_SUGGESTIONS: SuggestedAction[] = [
     prompt: "Create a table widget of the top 10 accounts by open balance.",
   },
   {
-    id: "cleanup-homepage",
-    label: "Clean up the homepage and remove low-value widgets",
-    prompt: "Clean up the homepage and remove low-value widgets.",
+    id: "reorganize-homepage",
+    label: "Reorganize this homepage so the most important metrics are on top",
+    prompt: "Reorganize this homepage so the most important metrics are on top.",
   },
 ];
 
@@ -146,11 +147,13 @@ function isWidgetRecommendationPrompt(text: string) {
   );
 }
 
-function isHomepageCleanupPrompt(text: string) {
+function isHomepageReorganizePrompt(text: string) {
   const normalized = text.trim().toLowerCase();
 
   return (
-    normalized.includes("clean up") && normalized.includes("homepage") ||
+    (normalized.includes("reorganize") && normalized.includes("homepage")) ||
+    (normalized.includes("important metrics") && normalized.includes("top")) ||
+    (normalized.includes("clean up") && normalized.includes("homepage")) ||
     normalized.includes("remove low-value widgets")
   );
 }
@@ -203,39 +206,45 @@ export function getHomepageConfigAssistantResponse(
   prompt: string,
   options: {
     addedWidgetIds: string[];
+    aiDashboardVariant?: AiGeneratedDashboardVariant;
+    aiLibraryWidgetIds?: DashboardWidgetId[];
     extraExcludedWidgetIds?: string[];
     hiddenMetricCardLabels: string[];
     isAiGenerated: boolean;
     isEmptyHomepage?: boolean;
     layout: HomepageLayout;
+    metricCardOrder: string[] | null;
     removedWidgetIds: DashboardWidgetId[];
     revenueProgressAdded: boolean;
     widgetOrder: DashboardWidgetId[] | null;
   },
 ): AssistantResponse {
-  if (isHomepageCleanupPrompt(prompt)) {
+  if (isHomepageReorganizePrompt(prompt)) {
     const cleanupProposal = proposeHomepageCleanup({
       addedWidgetIds: options.addedWidgetIds,
+      aiDashboardVariant: options.aiDashboardVariant,
+      aiLibraryWidgetIds: options.aiLibraryWidgetIds,
       hiddenMetricCardLabels: options.hiddenMetricCardLabels,
       layout: options.layout,
+      metricCardOrder: options.metricCardOrder,
       removedWidgetIds: options.removedWidgetIds,
       revenueProgressAdded: options.revenueProgressAdded,
+      startWithEmptyHomepage: options.isEmptyHomepage,
       widgetOrder: options.widgetOrder,
     });
 
     if (!cleanupProposal) {
       return {
         message:
-          "Your homepage is already streamlined. There are no additional low-value widgets to remove right now.",
+          "Your homepage already puts the most important metrics up top. Tell me if you'd like to adjust the layout further.",
         showFeedback: false,
       };
     }
 
-    const removedCount = cleanupProposal.removedWidgetNames.length;
-
     return {
       cleanupProposal,
-      message: `I reviewed your homepage and found ${removedCount} low-value widget${removedCount === 1 ? "" : "s"} to remove. I've noted why each one can go and rearranged the rest to surface the most useful insights first.`,
+      message:
+        "I reorganized your homepage so the most important metrics appear first. Review the updated layout order below.",
       showFeedback: false,
     };
   }

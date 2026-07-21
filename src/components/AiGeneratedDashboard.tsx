@@ -2,7 +2,7 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { useMemo, useState } from "react";
 import type { AiGeneratedDashboardVariant } from "../ai/types";
 import { AiAddedWidgets } from "./AiAddedWidgets";
-import type { DashboardWidgetId } from "./dashboardWidgets/catalog";
+import { DASHBOARD_WIDGET_CATALOG, type DashboardWidgetId } from "./dashboardWidgets/catalog";
 import type { CustomWidget } from "../customWidgets/types";
 import type { RefObject } from "react";
 import { WidgetSourceBadge } from "./WidgetSourceBadge";
@@ -192,6 +192,7 @@ export function AiGeneratedDashboard({
   hiddenMetricCardLabels = [],
   highlightedWidgetRefId,
   libraryWidgetIds = [],
+  metricCardOrder = null,
   showWidgetSources = false,
   variant = "default",
   widgetRef,
@@ -201,13 +202,36 @@ export function AiGeneratedDashboard({
   hiddenMetricCardLabels?: string[];
   highlightedWidgetRefId?: string | null;
   libraryWidgetIds?: DashboardWidgetId[];
+  metricCardOrder?: string[] | null;
   showWidgetSources?: boolean;
   variant?: AiGeneratedDashboardVariant;
   widgetRef?: RefObject<HTMLElement | null>;
 }) {
   const metricCards = variant === "month-end-close" ? monthEndCloseMetricCards : defaultMetricCards;
-  const visibleMetricCards = metricCards.filter((card) => !hiddenMetricCardLabels.includes(card.label));
+  const defaultVisibleMetricCards = metricCards.filter(
+    (card) => !hiddenMetricCardLabels.includes(card.label),
+  );
+  const visibleMetricCards =
+    metricCardOrder && metricCardOrder.length > 0
+      ? [
+          ...metricCardOrder
+            .map((label) => defaultVisibleMetricCards.find((card) => card.label === label))
+            .filter((card): card is (typeof metricCards)[number] => card !== undefined),
+          ...defaultVisibleMetricCards.filter((card) => !metricCardOrder.includes(card.label)),
+        ]
+      : defaultVisibleMetricCards;
   const showTrendChart = variant === "default";
+  const visibleLibraryWidgetIds = useMemo(
+    () => [
+      ...new Set([
+        ...libraryWidgetIds,
+        ...addedWidgetIds.filter(
+          (id): id is DashboardWidgetId => DASHBOARD_WIDGET_CATALOG.some((widget) => widget.id === id),
+        ),
+      ]),
+    ],
+    [addedWidgetIds, libraryWidgetIds],
+  );
 
   return (
     <section className="ai-generated-dashboard" data-node-id="225:41367">
@@ -227,7 +251,7 @@ export function AiGeneratedDashboard({
         addedWidgetIds={addedWidgetIds}
         getCustomWidgetById={getCustomWidgetById}
         highlightedWidgetRefId={highlightedWidgetRefId}
-        widgetIds={libraryWidgetIds}
+        widgetIds={visibleLibraryWidgetIds}
         widgetRef={widgetRef}
       />
     </section>

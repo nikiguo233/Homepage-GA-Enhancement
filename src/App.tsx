@@ -37,6 +37,7 @@ import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -71,15 +72,21 @@ import { WidgetDrawerShell } from "./components/customWidgets/WidgetDrawerShell"
 import { WidgetSizePreview } from "./components/customWidgets/WidgetSizePreview";
 import { HomepageActionsMenu } from "./components/customWidgets/HomepageActionsMenu";
 import { ManageCustomWidgetsPage } from "./components/customWidgets/ManageCustomWidgetsPage";
-import { AiGeneratedWidgetDetailModal } from "./components/customWidgets/AiGeneratedWidgetDetailModal";
+import { AiGeneratedWidgetEditor } from "./components/customWidgets/AiGeneratedWidgetEditor";
 import { ManageTemplatesHubPage } from "./components/customWidgets/ManageTemplatesHubPage";
 import {
   ManageTemplatesPage,
   type ManageTemplatesTab,
 } from "./components/customWidgets/ManageTemplatesPage";
 import { useHomepageTemplates } from "./homepageConfig/useHomepageTemplates";
+import {
+  getCustomWidgetSavedStatus,
+  getCustomWidgetVisibilityChipLabel,
+  normalizeCustomWidgetAccess,
+} from "./customWidgets/widgetAccess";
 import { createCustomWidgetRefId } from "./customWidgets/types";
 import type { CustomWidget, CustomWidgetDraft, CustomWidgetSize } from "./customWidgets/types";
+import { saveAiGeneratedHomepageMetricWidgets } from "./customWidgets/aiGeneratedMetricWidgets";
 import { useCustomWidgets } from "./customWidgets/useCustomWidgets";
 
 const menuItems = [
@@ -135,7 +142,7 @@ type HomepageView =
   | "create-widget"
   | "edit-widget"
   | "edit-template";
-type ManageWidgetsTab = "published" | "drafts" | "history";
+type ManageWidgetsTab = "published" | "private" | "history";
 
 const WIDGET_TYPES = [
   {
@@ -1070,6 +1077,67 @@ function WidgetPanelCustomWidgetsEntry({
   );
 }
 
+function CustomWidgetTypeCard({
+  onSelect,
+  widget,
+}: {
+  onSelect: () => void;
+  widget: CustomWidget;
+}) {
+  return (
+    <article className="widget-type-card">
+      <div className="widget-type-card-copy">
+        <strong>{widget.name}</strong>
+        <p>{widget.description}</p>
+      </div>
+      <div className="widget-type-card-actions">
+        <span className="widget-type-custom-tag">{getCustomWidgetVisibilityChipLabel(widget.access)}</span>
+        <button className="widget-type-select-button" onClick={onSelect} type="button">
+          Select
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function WidgetTypeListGroup({
+  children,
+  count,
+  expanded,
+  onToggle,
+  title,
+}: {
+  children: ReactNode;
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+  title: string;
+}) {
+  const panelId = useId();
+
+  return (
+    <section className={`widget-type-list-group${expanded ? "" : " is-collapsed"}`}>
+      <button
+        aria-controls={panelId}
+        aria-expanded={expanded}
+        className="widget-type-list-group-header"
+        onClick={onToggle}
+        type="button"
+      >
+        <span className="widget-type-list-group-title">
+          {title} <span className="widget-type-list-group-count">({count})</span>
+        </span>
+        <ExpandMoreIcon aria-hidden="true" className="widget-type-list-group-chevron" />
+      </button>
+      {expanded ? (
+        <div className="widget-type-list-group-items" id={panelId}>
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function AddWidgetPanel({
   customWidgets,
   onClose,
@@ -1108,6 +1176,20 @@ function AddWidgetPanel({
       widget.description.toLowerCase().includes(normalizedQuery)
     );
   });
+  const isSearching = normalizedQuery.length > 0;
+  const [standardWidgetsExpanded, setStandardWidgetsExpanded] = useState(true);
+  const [customWidgetsExpanded, setCustomWidgetsExpanded] = useState(true);
+  const showStandardGroup = !isSearching || visibleWidgets.length > 0;
+  const showCustomGroup = !isSearching || visibleCustomWidgets.length > 0;
+
+  useEffect(() => {
+    if (!isSearching) {
+      return;
+    }
+
+    setStandardWidgetsExpanded(visibleWidgets.length > 0);
+    setCustomWidgetsExpanded(visibleCustomWidgets.length > 0);
+  }, [isSearching, visibleCustomWidgets.length, visibleWidgets.length]);
 
   return (
     <WidgetDrawerShell
@@ -1127,36 +1209,41 @@ function AddWidgetPanel({
         />
       </label>
       <div className="widget-type-list">
-        {visibleWidgets.length > 0 ? (
-          visibleWidgets.map((widget) => (
-            <WidgetTypeCard
-              configurable={widget.configurable}
-              description={widget.description}
-              key={widget.id}
-              name={widget.name}
-              onSelect={() => onSelectWidget(widget.id)}
-            />
-          ))
+        {showStandardGroup ? (
+          <WidgetTypeListGroup
+            count={visibleWidgets.length}
+            expanded={standardWidgetsExpanded}
+            onToggle={() => setStandardWidgetsExpanded((current) => !current)}
+            title="Standard widgets"
+          >
+            {visibleWidgets.map((widget) => (
+              <WidgetTypeCard
+                configurable={widget.configurable}
+                description={widget.description}
+                key={widget.id}
+                name={widget.name}
+                onSelect={() => onSelectWidget(widget.id)}
+              />
+            ))}
+          </WidgetTypeListGroup>
         ) : null}
-        {visibleCustomWidgets.map((widget) => (
-          <article className="widget-type-card" key={widget.id}>
-            <div className="widget-type-card-copy">
-              <strong>{widget.name}</strong>
-              <p>{widget.description}</p>
-            </div>
-            <div className="widget-type-card-actions">
-              <span className="widget-type-custom-tag">Custom</span>
-              <button
-                className="widget-type-select-button"
-                onClick={() => onSelectCustomWidget(widget.id)}
-                type="button"
-              >
-                Select
-              </button>
-            </div>
-          </article>
-        ))}
-        {visibleWidgets.length === 0 && visibleCustomWidgets.length === 0 ? (
+        {showCustomGroup ? (
+          <WidgetTypeListGroup
+            count={visibleCustomWidgets.length}
+            expanded={customWidgetsExpanded}
+            onToggle={() => setCustomWidgetsExpanded((current) => !current)}
+            title="Custom widgets"
+          >
+            {visibleCustomWidgets.map((widget) => (
+              <CustomWidgetTypeCard
+                key={widget.id}
+                onSelect={() => onSelectCustomWidget(widget.id)}
+                widget={widget}
+              />
+            ))}
+          </WidgetTypeListGroup>
+        ) : null}
+        {!showStandardGroup && !showCustomGroup ? (
           <p className="widget-type-empty">No widgets match your search.</p>
         ) : null}
         <WidgetPanelCustomWidgetsEntry onOpenManageCustomWidgets={onOpenManageCustomWidgets} />
@@ -1547,6 +1634,7 @@ function DashboardGrid({
   hiddenMetricCardLabels,
   highlightedWidgetRefId,
   isAiGenerated,
+  metricCardOrder,
   removedWidgetIds,
   revenueProgressAdded,
   startWithEmptyHomepage,
@@ -1560,6 +1648,7 @@ function DashboardGrid({
   hiddenMetricCardLabels: string[];
   highlightedWidgetRefId: string | null;
   isAiGenerated: boolean;
+  metricCardOrder: string[] | null;
   removedWidgetIds: DashboardWidgetId[];
   revenueProgressAdded: boolean;
   startWithEmptyHomepage: boolean;
@@ -1574,6 +1663,7 @@ function DashboardGrid({
           hiddenMetricCardLabels={hiddenMetricCardLabels}
           highlightedWidgetRefId={highlightedWidgetRefId}
           libraryWidgetIds={aiLibraryWidgetIds}
+          metricCardOrder={metricCardOrder}
           variant={aiDashboardVariant}
           widgetRef={addedWidgetRef}
         />
@@ -1635,6 +1725,7 @@ export function App() {
     hiddenMetricCardLabels,
     isAiGenerated,
     layout,
+    metricCardOrder,
     removedWidgetIds,
     resetToDefaultLayout,
     undoCleanup,
@@ -1643,7 +1734,7 @@ export function App() {
   const {
     clearHistory,
     deleteWidget,
-    draftWidgets,
+    privateWidgets,
     getWidgetById,
     historyEntries,
     publishedWidgets,
@@ -1664,7 +1755,6 @@ export function App() {
     customWidgetEditorCapture ? "create-widget" : "home",
   );
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
-  const [viewingAiGeneratedWidgetId, setViewingAiGeneratedWidgetId] = useState<string | null>(null);
   const [aiSuggestedWidgetDraft, setAiSuggestedWidgetDraft] = useState<CustomWidgetDraft | null>(null);
   const [aiSuggestedEditorStep, setAiSuggestedEditorStep] = useState<EditorStep | null>(null);
   const [aiSuggestedTemplateDraft, setAiSuggestedTemplateDraft] =
@@ -1729,7 +1819,14 @@ export function App() {
 
       addWidgets(dashboardWidgetIds);
 
-      if (!isAiGenerated && dashboardWidgetIds.includes("revenue-progress")) {
+      if (isAiGenerated) {
+        setHighlightedWidgetRefId(dashboardWidgetIds[0] ?? null);
+        showFeedbackToast(
+          dashboardWidgetIds.length === 1
+            ? "Widget added to your homepage."
+            : `${dashboardWidgetIds.length} widgets added to your homepage.`,
+        );
+      } else if (dashboardWidgetIds.includes("revenue-progress")) {
         setRevenueProgressAdded(true);
         setHighlightedWidgetRefId("revenue-progress");
         showFeedbackToast("Revenue Progress has been added.", { showViewWidgetAction: true });
@@ -1740,13 +1837,15 @@ export function App() {
   const handleApplyCleanup = useCallback(
     (plan: HomepageCleanupPlan) => {
       cleanupRevenueProgressSnapshot.current = revenueProgressAdded;
-      applyCleanupPlan(plan);
+      applyCleanupPlan(plan, { startWithEmptyHomepage: startWithEmptyHomepage && !isAiGenerated });
 
-      if (plan.removedWidgetIds.includes("revenue-progress")) {
+      if (plan.orderedWidgetIds.includes("revenue-progress")) {
+        setRevenueProgressAdded(true);
+      } else if (plan.removedWidgetIds.includes("revenue-progress")) {
         setRevenueProgressAdded(false);
       }
     },
-    [applyCleanupPlan, revenueProgressAdded],
+    [applyCleanupPlan, isAiGenerated, revenueProgressAdded, startWithEmptyHomepage],
   );
   const handleUndoCleanup = useCallback(() => {
     undoCleanup();
@@ -1784,15 +1883,18 @@ export function App() {
       setShowOnboarding(false);
 
       if (widget?.isAiGenerated) {
-        setViewingAiGeneratedWidgetId(widgetId);
-        setManageWidgetsTab("drafts");
+        setEditingWidgetId(widgetId);
+        setAiSuggestedWidgetDraft(null);
+        setAiSuggestedEditorStep("basic");
+        setManageWidgetsTab("private");
+        setHomepageView("edit-widget");
         return;
       }
 
       setEditingWidgetId(widgetId);
       setAiSuggestedWidgetDraft(null);
       setAiSuggestedEditorStep("configure");
-      setManageWidgetsTab("drafts");
+      setManageWidgetsTab("private");
       setHomepageView("edit-widget");
     },
     [dismissFeedbackToast, getWidgetById],
@@ -1849,16 +1951,23 @@ export function App() {
   const handleApplyAiGeneratedPreview = useCallback(
     (preview?: ChatPreview) => {
       if (preview?.kind === "ai-generated-homepage") {
+        const variant = preview.variant ?? "default";
+
         applyAiGeneratedLayout({
           libraryWidgetIds: preview.libraryWidgetIds,
-          variant: preview.variant ?? "default",
+          variant,
+        });
+        saveAiGeneratedHomepageMetricWidgets({
+          existingWidgets: widgets,
+          saveWidget,
+          variant,
         });
         return;
       }
 
       applyAiGeneratedLayout();
     },
-    [applyAiGeneratedLayout],
+    [applyAiGeneratedLayout, saveWidget, widgets],
   );
   const isEmptyHomepage = startWithEmptyHomepage && !isAiGenerated;
   const {
@@ -1887,11 +1996,14 @@ export function App() {
     thinkingProcess,
   } = useAiHomepageConfigChat({
     addedWidgetIds,
+    aiDashboardVariant,
+    aiLibraryWidgetIds,
     extraExcludedWidgetIds: revenueProgressAdded ? ["revenue-progress"] : [],
     hiddenMetricCardLabels,
     isAiGenerated,
     isEmptyHomepage,
     layout,
+    metricCardOrder,
     onAddWidgets: handleAddRecommendedWidgets,
     onApplyCleanup: handleApplyCleanup,
     onApplyPreview: handleApplyAiGeneratedPreview,
@@ -2018,52 +2130,19 @@ export function App() {
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
 
-  const handlePublishAiGeneratedWidget = useCallback(
-    (widgetId: string) => {
-      const widget = getWidgetById(widgetId);
+  const handleOpenAiChatFromCustomWidgetEditor = useCallback(() => {
+    const widget = editingWidgetId ? getWidgetById(editingWidgetId) : undefined;
+    const widgetName =
+      widget?.name?.trim() ||
+      aiSuggestedWidgetDraft?.name?.trim() ||
+      "custom widget";
 
-      if (!widget || widget.status !== "draft") {
-        return;
-      }
-
-      saveWidget({ ...widget, status: "published" }, widgetId);
-      setViewingAiGeneratedWidgetId(null);
-      setManageWidgetsTab("published");
-      showFeedbackToast(`${widget.name?.trim() || "Custom widget"} published.`);
-    },
-    [getWidgetById, saveWidget, showFeedbackToast],
-  );
-
-  const handleUnpublishAiGeneratedWidget = useCallback(
-    (widgetId: string) => {
-      const widget = getWidgetById(widgetId);
-
-      if (!widget || widget.status !== "published") {
-        return;
-      }
-
-      saveWidget({ ...widget, status: "draft" }, widgetId);
-      setViewingAiGeneratedWidgetId(null);
-      setManageWidgetsTab("drafts");
-      showFeedbackToast(`${widget.name?.trim() || "Custom widget"} unpublished.`);
-    },
-    [getWidgetById, saveWidget, showFeedbackToast],
-  );
-
-  const handleEditAiGeneratedWidgetWithAi = useCallback(
-    (widgetId: string) => {
-      const widget = getWidgetById(widgetId);
-      const widgetName = widget?.name?.trim() || "custom widget";
-
-      setViewingAiGeneratedWidgetId(null);
-      startChat({
-        context: "custom-widget",
-        draftMessage: `Help me update the "${widgetName}" widget`,
-        reset: true,
-      });
-    },
-    [getWidgetById, startChat],
-  );
+    startChat({
+      context: "custom-widget",
+      draftMessage: `Help me update the "${widgetName}" widget`,
+      reset: true,
+    });
+  }, [aiSuggestedWidgetDraft?.name, editingWidgetId, getWidgetById, startChat]);
 
   const handleOpenAiChatFromManageWidgets = useCallback(() => {
     startChat({ context: "custom-widget", reset: true });
@@ -2085,20 +2164,12 @@ export function App() {
     setHomepageView("create-widget");
   }, []);
 
-  const handleEditCustomWidget = useCallback(
-    (widgetId: string) => {
-      const widget = getWidgetById(widgetId);
-
-      if (widget?.isAiGenerated) {
-        setViewingAiGeneratedWidgetId(widgetId);
-        return;
-      }
-
-      setEditingWidgetId(widgetId);
-      setHomepageView("edit-widget");
-    },
-    [getWidgetById],
-  );
+  const handleEditCustomWidget = useCallback((widgetId: string) => {
+    setEditingWidgetId(widgetId);
+    setAiSuggestedWidgetDraft(null);
+    setAiSuggestedEditorStep(null);
+    setHomepageView("edit-widget");
+  }, []);
 
   const handleCloseCustomWidgetEditor = useCallback(() => {
     setHomepageView("manage-custom-widgets");
@@ -2154,39 +2225,38 @@ export function App() {
 
   const handleSaveCustomWidget = useCallback(
     (draft: Parameters<typeof saveWidget>[0]) => {
+      const access = normalizeCustomWidgetAccess(draft.access);
+      const status = getCustomWidgetSavedStatus(access);
+
       flushSync(() => {
         showFeedbackToast("Custom widget saved.");
       });
 
-      const widgetId = saveWidget(draft, editingWidgetId ?? undefined);
+      saveWidget({ ...draft, access, status }, editingWidgetId ?? undefined);
+      setEditingWidgetId(null);
+      setAiSuggestedWidgetDraft(null);
+      setAiSuggestedEditorStep(null);
+      setManageWidgetsTab(access === "private" ? "private" : "published");
+      setHomepageView("manage-custom-widgets");
+    },
+    [editingWidgetId, saveWidget, showFeedbackToast],
+  );
 
-      if (widgetId !== editingWidgetId) {
-        setEditingWidgetId(widgetId);
+  const handleSaveAiGeneratedWidget = useCallback(
+    (access: Parameters<typeof saveWidget>[0]["access"]) => {
+      if (!editingWidgetId) {
+        return;
       }
-    },
-    [editingWidgetId, saveWidget, showFeedbackToast],
-  );
 
-  const handlePublishCustomWidget = useCallback(
-    (draft: Parameters<typeof saveWidget>[0]) => {
-      saveWidget({ ...draft, status: "published" }, editingWidgetId ?? undefined);
-      setEditingWidgetId(null);
-      setManageWidgetsTab("published");
-      setHomepageView("manage-custom-widgets");
-      showFeedbackToast("Custom widget published.");
-    },
-    [editingWidgetId, saveWidget, showFeedbackToast],
-  );
+      const widget = getWidgetById(editingWidgetId);
 
-  const handleUnpublishCustomWidget = useCallback(
-    (draft: Parameters<typeof saveWidget>[0]) => {
-      saveWidget({ ...draft, status: "draft" }, editingWidgetId ?? undefined);
-      setEditingWidgetId(null);
-      setManageWidgetsTab("drafts");
-      setHomepageView("manage-custom-widgets");
-      showFeedbackToast("Custom widget unpublished.");
+      if (!widget) {
+        return;
+      }
+
+      handleSaveCustomWidget({ ...widget, access });
     },
-    [editingWidgetId, saveWidget, showFeedbackToast],
+    [editingWidgetId, getWidgetById, handleSaveCustomWidget],
   );
 
   const handleDeleteCustomWidget = useCallback(() => {
@@ -2242,10 +2312,6 @@ export function App() {
         return;
       }
 
-      if (widget.access === "tenant" && widget.status !== "published") {
-        return;
-      }
-
       setWidgetDrawerConfigureEntry("direct");
       setWidgetDrawerConfigureKind("custom-widget");
       setConfiguringCustomWidgetId(widgetId);
@@ -2266,7 +2332,9 @@ export function App() {
 
   const handleAddCustomWidgetToHomepageFromEditor = useCallback(
     (draft: CustomWidgetDraft) => {
-      const widgetId = saveWidget(draft, editingWidgetId ?? undefined);
+      const access = normalizeCustomWidgetAccess(draft.access);
+      const status = getCustomWidgetSavedStatus(access);
+      const widgetId = saveWidget({ ...draft, access, status }, editingWidgetId ?? undefined);
 
       if (widgetId !== editingWidgetId) {
         setEditingWidgetId(widgetId);
@@ -2537,16 +2605,14 @@ export function App() {
   }, [scrollRef, showOnboarding]);
 
   const editingWidget = editingWidgetId ? getWidgetById(editingWidgetId) : undefined;
-  const viewingAiGeneratedWidget = viewingAiGeneratedWidgetId
-    ? getWidgetById(viewingAiGeneratedWidgetId)
-    : undefined;
+  const isEditingAiGeneratedWidget = Boolean(editingWidget?.isAiGenerated);
   const configuringCustomWidget = configuringCustomWidgetId
     ? getWidgetById(configuringCustomWidgetId)
     : undefined;
   const customWidgetSummary =
     widgets.length === 0
       ? "You don't have any custom widgets yet."
-      : `${publishedWidgets.length} Published, ${draftWidgets.length} Drafts`;
+      : `${publishedWidgets.length} Shared, ${privateWidgets.length} Personal`;
   const templateSummary =
     templates.length === 0
       ? "You don't have any templates yet."
@@ -2612,7 +2678,7 @@ export function App() {
               configureCustomWidgetSize={configureCustomWidgetSize}
               configureKind={widgetDrawerConfigureKind}
               configuringCustomWidget={configuringCustomWidget}
-              customWidgets={publishedWidgets}
+              customWidgets={[...publishedWidgets, ...privateWidgets]}
               onAddRevenueProgress={handleConfirmAddRevenueProgress}
               onBackToSelect={handleConfigureBack}
               onClose={handleCloseWidgetDrawer}
@@ -2673,6 +2739,7 @@ export function App() {
                   hiddenMetricCardLabels={hiddenMetricCardLabels}
                   highlightedWidgetRefId={highlightedWidgetRefId}
                   isAiGenerated={isAiGenerated}
+                  metricCardOrder={metricCardOrder}
                   removedWidgetIds={removedWidgetIds}
                   revenueProgressAdded={revenueProgressAdded}
                   startWithEmptyHomepage={isEmptyHomepage}
@@ -2709,7 +2776,7 @@ export function App() {
           {homepageView === "manage-custom-widgets" ? (
             <ManageCustomWidgetsPage
               activeTab={manageWidgetsTab}
-              draftWidgets={draftWidgets}
+              privateWidgets={privateWidgets}
               historyEntries={historyEntries}
               onAddToHomepage={handleAddPublishedWidgetToHomepage}
               onClearHistory={clearHistory}
@@ -2725,8 +2792,19 @@ export function App() {
             />
           ) : null}
         </div>
-        {isEditorOpen ? (
+        {isEditorOpen && isEditingAiGeneratedWidget && editingWidget ? (
+          <AiGeneratedWidgetEditor
+            aiChatOpen={aiChatOpen}
+            initialStep={aiSuggestedEditorStep ?? "basic"}
+            onAddToHomepage={() => handleAddPublishedWidgetToHomepage(editingWidget.id)}
+            onClose={handleCloseCustomWidgetEditor}
+            onOpenAiChat={handleOpenAiChatFromCustomWidgetEditor}
+            onSave={handleSaveAiGeneratedWidget}
+            widget={editingWidget}
+          />
+        ) : isEditorOpen ? (
           <CustomWidgetEditor
+            aiChatOpen={aiChatOpen}
             initialDraft={
               aiSuggestedWidgetDraft ??
               customWidgetEditorCapture?.draft ??
@@ -2756,9 +2834,8 @@ export function App() {
             onAddToHomepage={handleAddCustomWidgetToHomepageFromEditor}
             onClose={handleCloseCustomWidgetEditor}
             onDelete={handleDeleteCustomWidget}
-            onPublish={handlePublishCustomWidget}
+            onOpenAiChat={handleOpenAiChatFromCustomWidgetEditor}
             onSave={handleSaveCustomWidget}
-            onUnpublish={handleUnpublishCustomWidget}
           />
         ) : null}
         {isTemplateEditorOpen && activeTemplateDraft ? (
@@ -2803,15 +2880,8 @@ export function App() {
           thinkingProcess={thinkingProcess}
         />
       </div>
-      {!aiChatOpen && !isTemplateEditorOpen ? <AiChatBadge onClick={handleOpenAiChatBadge} /> : null}
-      {viewingAiGeneratedWidget ? (
-        <AiGeneratedWidgetDetailModal
-          onClose={() => setViewingAiGeneratedWidgetId(null)}
-          onEditWithAi={() => handleEditAiGeneratedWidgetWithAi(viewingAiGeneratedWidget.id)}
-          onPublish={() => handlePublishAiGeneratedWidget(viewingAiGeneratedWidget.id)}
-          onUnpublish={() => handleUnpublishAiGeneratedWidget(viewingAiGeneratedWidget.id)}
-          widget={viewingAiGeneratedWidget}
-        />
+      {!aiChatOpen && !isTemplateEditorOpen && !isEditorOpen ? (
+        <AiChatBadge onClick={handleOpenAiChatBadge} />
       ) : null}
     </div>
   );

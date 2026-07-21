@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { normalizeStoredAiGeneratedMetricWidget } from "./aiGeneratedMetricWidgets";
 import { DEFAULT_CUSTOM_WIDGET_HTML, DEFAULT_EMBED_URL } from "./defaultTemplate";
 import { createDefaultEmbedConfig, normalizeEmbedConfig } from "./embedConfig";
 import type {
@@ -31,7 +32,7 @@ function loadWidgets(): CustomWidget[] {
     return Array.isArray(parsed)
       ? parsed.map((widget) => {
           const size = normalizeWidgetSize(widget.size);
-          return {
+          return normalizeStoredAiGeneratedMetricWidget({
             ...widget,
             size,
             supportedSizes: normalizeSupportedWidgetSizes(widget.supportedSizes, size),
@@ -41,7 +42,7 @@ function loadWidgets(): CustomWidget[] {
             isAiGenerated: Boolean(widget.isAiGenerated),
             ...normalizeEmbedConfig(widget),
             dataBinding: normalizeWidgetDataBinding(widget),
-          };
+          });
         })
       : [];
   } catch {
@@ -206,15 +207,15 @@ export function useCustomWidgets() {
     setHistoryEntries([]);
   }, []);
 
-  const publishedWidgets = widgets.filter((widget) => widget.status === "published");
-  const draftWidgets = widgets.filter((widget) => widget.status === "draft");
+  const privateWidgets = widgets.filter((widget) => widget.access === "private");
+  const publishedWidgets = widgets.filter((widget) => widget.access === "tenant");
 
   return {
     clearHistory,
     deleteWidget,
-    draftWidgets,
     getWidgetById,
     historyEntries,
+    privateWidgets,
     publishWidget,
     publishedWidgets,
     saveWidget,
