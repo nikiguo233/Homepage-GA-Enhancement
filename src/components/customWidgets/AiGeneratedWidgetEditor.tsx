@@ -7,6 +7,7 @@ import {
 } from "../../customWidgets/widgetAccess";
 import { getWidgetSizeLabel } from "../../customWidgets/widgetSizes";
 import { AiChatBadge } from "../../AiChatPanel";
+import { AiButton } from "../AiButton";
 import { PublishConfirmModal } from "./CustomWidgetDashboardCard";
 import { WidgetEditorPreviewGrid } from "./WidgetEditorPreviewGrid";
 
@@ -100,10 +101,19 @@ export function AiGeneratedWidgetEditor({
             onClick={() => setStep("configure")}
             type="button"
           >
-            Configure and Preview
+            Preview
           </button>
         </nav>
         <div className="custom-widget-editor-header-actions">
+          <AiButton
+            background="light"
+            className="custom-widget-editor-edit-with-ai-button"
+            onClick={() => onOpenAiChat?.()}
+            size="medium"
+            variant="secondary"
+          >
+            Edit with AI
+          </AiButton>
           {showAddToHomepage ? (
             <button
               className="custom-widget-editor-secondary-button"

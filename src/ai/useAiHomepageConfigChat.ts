@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { HomepageLayout } from "../homepageConfig/types";
 import type { HomepageCleanupPlan } from "../homepageConfig/homepageCleanup";
 import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
@@ -93,6 +93,7 @@ export function useAiHomepageConfigChat(options: {
   const [inputMessage, setInputMessage] = useState("");
   const [showEmptyStateSuggestions, setShowEmptyStateSuggestions] = useState(true);
   const requestIdRef = useRef(0);
+  const pendingChatPromptRef = useRef<string | null>(null);
   const isThinking = thinkingProcess !== null;
   const suggestions = useMemo(
     () => getSuggestionsForContext(suggestionContext),
@@ -132,6 +133,30 @@ export function useAiHomepageConfigChat(options: {
       setAiChatOpen(true);
     },
     [],
+  );
+
+  const startChatWithPrompt = useCallback(
+    (
+      prompt: string,
+      options?: {
+        context?: AiChatSuggestionContext;
+        showEmptyStateSuggestions?: boolean;
+      },
+    ) => {
+      const trimmed = prompt.trim();
+
+      if (!trimmed) {
+        return;
+      }
+
+      pendingChatPromptRef.current = trimmed;
+      startChat({
+        context: options?.context ?? "homepage",
+        reset: true,
+        showEmptyStateSuggestions: options?.showEmptyStateSuggestions ?? false,
+      });
+    },
+    [startChat],
   );
 
   const closeChat = useCallback(() => {
@@ -230,6 +255,16 @@ export function useAiHomepageConfigChat(options: {
     },
     [isThinking, respondToPrompt],
   );
+
+  useEffect(() => {
+    if (!aiChatOpen || !pendingChatPromptRef.current) {
+      return;
+    }
+
+    const prompt = pendingChatPromptRef.current;
+    pendingChatPromptRef.current = null;
+    void respondToPrompt(prompt);
+  }, [aiChatOpen, respondToPrompt]);
 
   const handleSuggestedAction = useCallback(
     (action: SuggestedAction) => {
@@ -430,6 +465,7 @@ export function useAiHomepageConfigChat(options: {
     resetConversation,
     showEmptyStateSuggestions,
     startChat,
+    startChatWithPrompt,
     suggestionContext,
     suggestions,
     thinkingProcess,

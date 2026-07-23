@@ -22,8 +22,8 @@ import {
 } from "../../customWidgets/widgetHistory";
 import { ENABLE_CUSTOM_WIDGET_HISTORY_TAB } from "../../customWidgets/featureFlags";
 import { getWidgetGridPreviewSize } from "../../customWidgets/aiGeneratedMetricWidgets";
-import { AiButton } from "../AiButton";
 import { ManagementBreadcrumbs } from "./ManagementBreadcrumbs";
+import { CreateWidgetDropdown, type CreateWidgetOption } from "./CreateWidgetDropdown";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 import { AiGeneratedChip } from "./AiGeneratedChip";
 import { DeleteConfirmModal, ClearHistoryConfirmModal } from "./CustomWidgetDashboardCard";
@@ -56,8 +56,7 @@ export function ManageCustomWidgetsPage({
   historyEntries,
   onAddToHomepage,
   onClearHistory,
-  onCreateWidget,
-  onCreateWithAi,
+  onCreateWidgetOption,
   onDeleteWidget,
   onEditWidget,
   onGoHome,
@@ -71,8 +70,7 @@ export function ManageCustomWidgetsPage({
   historyEntries: CustomWidgetHistoryEntry[];
   onAddToHomepage: (widgetId: string) => void;
   onClearHistory: () => void;
-  onCreateWidget: () => void;
-  onCreateWithAi: () => void;
+  onCreateWidgetOption: (option: CreateWidgetOption) => void;
   onDeleteWidget: (widgetId: string) => void;
   onEditWidget: (widgetId: string) => void;
   onGoHome: () => void;
@@ -113,12 +111,7 @@ export function ManageCustomWidgetsPage({
       <div className="custom-widget-management-header">
         <h1>Custom Widgets</h1>
         <div className="custom-widget-management-header-actions">
-          <AiButton onClick={onCreateWithAi} variant="secondary">
-            Create with AI
-          </AiButton>
-          <button className="custom-widget-primary-button" onClick={onCreateWidget} type="button">
-            Create Widget
-          </button>
+          <CreateWidgetDropdown onSelect={onCreateWidgetOption} />
         </div>
       </div>
       <div className="custom-widget-tabs" role="tablist">

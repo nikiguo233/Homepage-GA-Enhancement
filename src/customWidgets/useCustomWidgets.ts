@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { normalizeStoredAiGeneratedMetricWidget } from "./aiGeneratedMetricWidgets";
+import { isAiGeneratedCustomWidget } from "./isAiGeneratedCustomWidget";
 import { DEFAULT_CUSTOM_WIDGET_HTML, DEFAULT_EMBED_URL } from "./defaultTemplate";
 import { createDefaultEmbedConfig, normalizeEmbedConfig } from "./embedConfig";
 import type {
@@ -39,7 +40,7 @@ function loadWidgets(): CustomWidget[] {
             access: normalizeCustomWidgetAccess(widget.access),
             labelAsExternalContent: Boolean(widget.labelAsExternalContent),
             displayWidgetName: Boolean(widget.displayWidgetName),
-            isAiGenerated: Boolean(widget.isAiGenerated),
+            isAiGenerated: isAiGeneratedCustomWidget(widget),
             ...normalizeEmbedConfig(widget),
             dataBinding: normalizeWidgetDataBinding(widget),
           });
