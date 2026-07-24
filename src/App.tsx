@@ -50,7 +50,7 @@ import configureHomepageIconUrl from "./assets/configure-homepage.svg";
 import { buildTopAccountsLiveDataProposal } from "./ai/assistantProposals";
 import { AI_RECOMMENDATION_TOP_ACCOUNTS_ID } from "./ai/recommendationRationales";
 import { useAiHomepageConfigChat } from "./ai/useAiHomepageConfigChat";
-import type { ChatPreview, CustomWidgetProposal, TeamTemplateProposal } from "./ai/types";
+import type { ChatPreview, CustomWidgetProposal, SuggestedAction, TeamTemplateProposal } from "./ai/types";
 import { HomepageTemplateEditor } from "./components/HomepageTemplateEditor";
 import { createTemplateDraftFromProposal, createTemplateId } from "./homepageConfig/teamTemplate";
 import type { HomepageTemplateDraft } from "./homepageConfig/teamTemplate";
@@ -2003,7 +2003,6 @@ export function App() {
     openChat,
     showEmptyStateSuggestions,
     startChat,
-    startChatWithPrompt,
     suggestionContext,
     suggestions,
     thinkingProcess,
@@ -2088,13 +2087,10 @@ export function App() {
     setStartWithEmptyHomepage(true);
   }, [resetToDefaultLayout]);
 
-  const handleOnboardingOpenAiChat = useCallback(() => {
-    prepareOnboardingAiSession();
-  }, [prepareOnboardingAiSession]);
-
-  const handleOnboardingCloseAiChat = useCallback(() => {
+  const handleOnboardingResetAiSession = useCallback(() => {
     closeChat();
-  }, [closeChat]);
+    handleNewChat();
+  }, [closeChat, handleNewChat]);
 
   const handleOnboardingLaunchAiPrompt = useCallback(
     (prompt: string) => {
@@ -2108,17 +2104,21 @@ export function App() {
       setHomepageView("home");
       setTemplateEditorReturnView("home");
       setShowOnboarding(false);
-      startChatWithPrompt(trimmed, {
+      startChat({
         context: "homepage",
+        draftMessage: trimmed,
+        reset: true,
         showEmptyStateSuggestions: false,
       });
     },
-    [prepareOnboardingAiSession, startChatWithPrompt],
+    [prepareOnboardingAiSession, startChat],
   );
 
-  const handleOnboardingSendMessage = useCallback(
-    (text: string) => {
-      handleOnboardingLaunchAiPrompt(text);
+  const handleOnboardingSelectAiPrompt = useCallback(
+    (action: SuggestedAction) => {
+      if (action.prompt?.trim()) {
+        handleOnboardingLaunchAiPrompt(action.prompt);
+      }
     },
     [handleOnboardingLaunchAiPrompt],
   );
@@ -2665,15 +2665,8 @@ export function App() {
 
   return showOnboarding ? (
     <OnboardingScreen
-      aiChatProps={{
-        inputMessage,
-        onClose: handleOnboardingCloseAiChat,
-        onInputMessageChange,
-        onNewChat: handleNewChat,
-        onSendMessage: handleOnboardingSendMessage,
-        onSuggestedAction: handleSuggestedAction,
-      }}
-      onOpenAiChat={handleOnboardingOpenAiChat}
+      onResetAiSession={handleOnboardingResetAiSession}
+      onSelectAiPrompt={handleOnboardingSelectAiPrompt}
       onSelectTemplate={handleSelectOnboardingTemplate}
     />
   ) : (

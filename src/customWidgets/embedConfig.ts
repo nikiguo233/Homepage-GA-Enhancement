@@ -4,19 +4,14 @@ import { validateEmbedUrl } from "./embedPolicy";
 export type { EmbedAuthenticationMode, EmbedAuthenticationType, EmbedCredentials, EmbedSource };
 
 export const EMBED_SOURCE_OPTIONS: { label: string; value: EmbedSource }[] = [
-  { value: "", label: "Select a source" },
-  { value: "salesforce", label: "Salesforce" },
   { value: "tableau", label: "Tableau" },
-  { value: "powerbi", label: "PowerBI" },
 ];
 
-export const EMBED_URL_PLACEHOLDERS: Record<Exclude<EmbedSource, "">, string> = {
-  salesforce: "https://yourinstance.lightning.force.com/lightning/r/Dashboard/.../view",
+export const EMBED_URL_PLACEHOLDERS: Record<EmbedSource, string> = {
   tableau: "https://your-server.tableau.com/#/site/YourSite/views/WorkbookName/ViewName",
-  powerbi: "https://app.powerbi.com/view?r=eyJ...",
 };
 
-const DEFAULT_EMBED_URL_PLACEHOLDER = "https://example.com/dashboard/embed";
+const DEFAULT_EMBED_URL_PLACEHOLDER = EMBED_URL_PLACEHOLDERS.tableau;
 
 export const EMBED_AUTHENTICATION_TYPE_OPTIONS: {
   label: string;
@@ -36,7 +31,7 @@ export const DEFAULT_EMBED_CREDENTIALS: EmbedCredentials = {
 
 export function createDefaultEmbedConfig() {
   return {
-    embedSource: "" as EmbedSource,
+    embedSource: "tableau" as EmbedSource,
     embedAuthenticationMode: "shared-credentials" as EmbedAuthenticationMode,
     embedAuthenticationType: "" as EmbedAuthenticationType,
     embedCredentials: { ...DEFAULT_EMBED_CREDENTIALS },
@@ -49,12 +44,12 @@ function isSupportedEmbedAuthenticationType(
   return EMBED_AUTHENTICATION_TYPE_OPTIONS.some((option) => option.value === authenticationType);
 }
 
-function isSupportedEmbedSource(source: EmbedSource | undefined): source is EmbedSource {
-  return EMBED_SOURCE_OPTIONS.some((option) => option.value === source);
+function isSupportedEmbedSource(source: EmbedSource | string | undefined): source is EmbedSource {
+  return source === "tableau";
 }
 
 export function getEmbedUrlPlaceholder(source: EmbedSource) {
-  return source ? EMBED_URL_PLACEHOLDERS[source] : DEFAULT_EMBED_URL_PLACEHOLDER;
+  return EMBED_URL_PLACEHOLDERS[source] ?? DEFAULT_EMBED_URL_PLACEHOLDER;
 }
 
 export function getEmbedCredentialFieldLabels(

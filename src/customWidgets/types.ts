@@ -6,7 +6,7 @@ export type CustomWidgetSize = PresetCustomWidgetSize | `${number}x${number}`;
 
 export type EmbedAuthenticationMode = "shared-credentials" | "user-login-required";
 export type EmbedAuthenticationType = "" | "oauth2" | "api-key" | "basic" | "saml";
-export type EmbedSource = "" | "salesforce" | "tableau" | "powerbi";
+export type EmbedSource = "tableau";
 
 export type EmbedCredentials = {
   credential1: string;

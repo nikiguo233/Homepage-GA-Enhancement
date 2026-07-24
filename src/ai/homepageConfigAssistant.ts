@@ -127,7 +127,7 @@ function isMonthEndCloseDashboardPrompt(text: string) {
 }
 
 function isHomepageCreationPrompt(text: string) {
-  const normalized = text.trim().toLowerCase();
+  const normalized = text.trim().toLowerCase().replace(/\bhome page\b/g, "homepage");
 
   return (
     normalized.includes("create a homepage") ||

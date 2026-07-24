@@ -13,6 +13,8 @@ const PREVIEW_REFERENCE_WIDTH = 1120;
 type AiChatDashboardPreviewProps = {
   getCustomWidgetById?: (widgetId: string) => CustomWidget | undefined;
   libraryWidgetIds?: DashboardWidgetId[];
+  metricCardOrder?: string[] | null;
+  showMetricCards?: boolean;
   showWidgetSources?: boolean;
   variant?: AiGeneratedDashboardVariant;
   widgetIds?: string[];
@@ -25,6 +27,8 @@ function resolvePreviewCustomWidget(widgetId: string): CustomWidget | undefined 
 function AiChatDashboardPreviewThumbnail({
   getCustomWidgetById = resolvePreviewCustomWidget,
   libraryWidgetIds = [],
+  metricCardOrder = null,
+  showMetricCards = true,
   showWidgetSources = false,
   variant = "default",
   widgetIds = [],
@@ -57,7 +61,7 @@ function AiChatDashboardPreviewThumbnail({
     return () => {
       observer.disconnect();
     };
-  }, [libraryWidgetIds, variant, widgetIds]);
+  }, [libraryWidgetIds, metricCardOrder, showMetricCards, variant, widgetIds]);
 
   return (
     <div className="ai-chat-preview-thumbnail" ref={containerRef} style={{ height }}>
@@ -74,6 +78,8 @@ function AiChatDashboardPreviewThumbnail({
           addedWidgetIds={widgetIds}
           getCustomWidgetById={getCustomWidgetById ?? resolvePreviewCustomWidget}
           libraryWidgetIds={libraryWidgetIds}
+          metricCardOrder={metricCardOrder}
+          showMetricCards={showMetricCards}
           showWidgetSources={showWidgetSources}
           variant={variant}
         />
@@ -85,7 +91,9 @@ function AiChatDashboardPreviewThumbnail({
 function AiChatDashboardPreviewModal({
   getCustomWidgetById = resolvePreviewCustomWidget,
   libraryWidgetIds = [],
+  metricCardOrder = null,
   onClose,
+  showMetricCards = true,
   showWidgetSources = false,
   variant = "default",
   widgetIds = [],
@@ -143,6 +151,8 @@ function AiChatDashboardPreviewModal({
             addedWidgetIds={widgetIds}
             getCustomWidgetById={getCustomWidgetById ?? resolvePreviewCustomWidget}
             libraryWidgetIds={libraryWidgetIds}
+            metricCardOrder={metricCardOrder}
+            showMetricCards={showMetricCards}
             showWidgetSources={showWidgetSources}
             variant={variant}
           />
@@ -156,6 +166,8 @@ function AiChatDashboardPreviewModal({
 export function AiChatHomepagePreview({
   getCustomWidgetById,
   libraryWidgetIds,
+  metricCardOrder,
+  showMetricCards = true,
   showWidgetSources = false,
   variant,
   widgetIds = [],
@@ -173,6 +185,8 @@ export function AiChatHomepagePreview({
         <AiChatDashboardPreviewThumbnail
           getCustomWidgetById={getCustomWidgetById}
           libraryWidgetIds={libraryWidgetIds}
+          metricCardOrder={metricCardOrder}
+          showMetricCards={showMetricCards}
           showWidgetSources={showWidgetSources}
           variant={variant}
           widgetIds={widgetIds}
@@ -186,12 +200,37 @@ export function AiChatHomepagePreview({
         <AiChatDashboardPreviewModal
           getCustomWidgetById={getCustomWidgetById}
           libraryWidgetIds={libraryWidgetIds}
+          metricCardOrder={metricCardOrder}
           onClose={() => setModalOpen(false)}
+          showMetricCards={showMetricCards}
           showWidgetSources={showWidgetSources}
           variant={variant}
           widgetIds={widgetIds}
         />
       ) : null}
     </>
+  );
+}
+
+export function AiChatCleanupHomepagePreview({
+  proposal,
+}: {
+  proposal: {
+    metricCardOrder: string[];
+    orderedWidgetIds: DashboardWidgetId[];
+  };
+}) {
+  const hasMetricCards = proposal.metricCardOrder.length > 0;
+  const variant = proposal.metricCardOrder.includes("Open Exceptions")
+    ? "month-end-close"
+    : "default";
+
+  return (
+    <AiChatHomepagePreview
+      libraryWidgetIds={proposal.orderedWidgetIds}
+      metricCardOrder={hasMetricCards ? proposal.metricCardOrder : null}
+      showMetricCards={hasMetricCards}
+      variant={variant}
+    />
   );
 }

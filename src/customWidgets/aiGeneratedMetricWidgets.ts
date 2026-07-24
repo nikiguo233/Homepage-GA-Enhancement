@@ -181,7 +181,7 @@ function buildAiMetricCardWidgetDraft(metric: AiMetricCardDefinition): CustomWid
     access: "private",
     labelAsExternalContent: false,
     displayWidgetName: false,
-    embedSource: "",
+    embedSource: "tableau",
     embedAuthenticationMode: "shared-credentials",
     embedAuthenticationType: "",
     embedCredentials: {

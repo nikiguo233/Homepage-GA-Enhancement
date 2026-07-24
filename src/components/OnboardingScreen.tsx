@@ -2,9 +2,10 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
 import { useMemo, useState } from "react";
 import type { SuggestedAction } from "../ai/types";
+import type { OnboardingAiPrompt } from "./onboarding/onboardingAiSuggestions";
 import aiSparklesIconUrl from "../assets/onboarding-ai-sparkles.svg";
 import layoutGridIconUrl from "../assets/onboarding-layout-grid.svg";
-import { OnboardingInlineAiChat } from "./onboarding/OnboardingInlineAiChat";
+import { OnboardingAiPromptCards } from "./onboarding/OnboardingAiPromptCards";
 import {
   ONBOARDING_TEMPLATES,
   type OnboardingTemplateId,
@@ -31,6 +32,14 @@ function OnboardingLandingHeader() {
   );
 }
 
+function OnboardingAiPromptsHeader() {
+  return (
+    <header className="onboarding-screen-header onboarding-screen-header--ai-prompts">
+      <h1 className="onboarding-screen-title">Get Started with AI</h1>
+    </header>
+  );
+}
+
 function OnboardingTemplatesHeader({
   searchQuery,
   setSearchQuery,
@@ -40,7 +49,7 @@ function OnboardingTemplatesHeader({
 }) {
   return (
     <header className="onboarding-screen-header onboarding-screen-header--templates">
-      <h1 className="onboarding-templates-page-title">Choose a template to get started</h1>
+      <h1 className="onboarding-screen-title">Choose a template to get started</h1>
       <label className="onboarding-screen-search">
         <SearchIcon aria-hidden="true" />
         <input
@@ -55,48 +64,22 @@ function OnboardingTemplatesHeader({
   );
 }
 
-function OnboardingAiTile({
-  aiChatProps,
-  expanded,
-  onExpand,
-}: {
-  aiChatProps: {
-    inputMessage: string;
-    onInputMessageChange: (value: string) => void;
-    onSendMessage: (text: string) => void;
-    onSuggestedAction: (action: SuggestedAction) => void;
-  };
-  expanded: boolean;
-  onExpand: () => void;
-}) {
+function OnboardingAiTile({ onExpand }: { onExpand: () => void }) {
   return (
-    <article
-      className={`onboarding-ai-tile${expanded ? " is-expanded" : ""}`}
-      data-node-id={expanded ? "361:26158" : "361:26123"}
-    >
-      <div aria-hidden="true" className="onboarding-ai-tile-border" />
+    <article className="onboarding-ai-tile" data-node-id="361:26123">
       <div className="onboarding-ai-tile-surface">
-        {expanded ? (
-          <OnboardingInlineAiChat
-            inputMessage={aiChatProps.inputMessage}
-            onInputMessageChange={aiChatProps.onInputMessageChange}
-            onSendMessage={aiChatProps.onSendMessage}
-            onSuggestedAction={aiChatProps.onSuggestedAction}
-          />
-        ) : (
-          <div className="onboarding-ai-tile-body">
-            <div className="onboarding-tile-icon-shell onboarding-tile-icon-shell--ai">
-              <img alt="" aria-hidden="true" className="onboarding-tile-icon" src={aiSparklesIconUrl} />
-            </div>
-            <div className="onboarding-tile-copy">
-              <h2>Start with AI</h2>
-              <p>Let AI create your personalized homepage based on a simple prompt.</p>
-            </div>
-            <button className="onboarding-ai-tile-button" onClick={onExpand} type="button">
-              Get Started with AI
-            </button>
+        <div className="onboarding-ai-tile-body">
+          <div className="onboarding-tile-icon-shell onboarding-tile-icon-shell--ai">
+            <img alt="" aria-hidden="true" className="onboarding-tile-icon" src={aiSparklesIconUrl} />
           </div>
-        )}
+          <div className="onboarding-tile-copy">
+            <h2>Start with AI</h2>
+            <p>Let AI create your personalized homepage based on a simple prompt.</p>
+          </div>
+          <button className="onboarding-ai-tile-button" onClick={onExpand} type="button">
+            Get Started with AI
+          </button>
+        </div>
       </div>
     </article>
   );
@@ -124,19 +107,12 @@ function OnboardingTemplateTile({ onBrowseTemplates }: { onBrowseTemplates: () =
 }
 
 export function OnboardingScreen({
-  aiChatProps,
-  onOpenAiChat,
+  onResetAiSession,
+  onSelectAiPrompt,
   onSelectTemplate,
 }: {
-  aiChatProps: {
-    inputMessage: string;
-    onClose: () => void;
-    onInputMessageChange: (value: string) => void;
-    onNewChat?: () => void;
-    onSendMessage: (text: string) => void;
-    onSuggestedAction: (action: SuggestedAction) => void;
-  };
-  onOpenAiChat: () => void;
+  onResetAiSession: () => void;
+  onSelectAiPrompt: (action: SuggestedAction) => void;
   onSelectTemplate: (templateId: OnboardingTemplateId) => void;
 }) {
   const [step, setStep] = useState<OnboardingStep>("landing");
@@ -158,26 +134,29 @@ export function OnboardingScreen({
   }, [searchQuery]);
 
   const handleExpandAi = () => {
-    onOpenAiChat();
     setAiExpanded(true);
   };
 
   const handleBackFromAi = () => {
     setAiExpanded(false);
-    aiChatProps.onClose();
-    aiChatProps.onNewChat?.();
+    onResetAiSession();
   };
 
   const handleBrowseTemplates = () => {
     setAiExpanded(false);
-    aiChatProps.onClose();
-    aiChatProps.onNewChat?.();
+    onResetAiSession();
     setStep("templates");
   };
 
   const handleBackToLanding = () => {
     setStep("landing");
     setSearchQuery("");
+  };
+
+  const handleSelectAiPrompt = (prompt: OnboardingAiPrompt) => {
+    if (prompt.prompt?.trim()) {
+      onSelectAiPrompt(prompt);
+    }
   };
 
   return (
@@ -189,24 +168,22 @@ export function OnboardingScreen({
       <div
         className={`onboarding-screen-content onboarding-screen-content--${step}${aiExpanded ? " is-ai-expanded" : ""}`}
       >
-        {step === "landing" ? (
+        {step === "landing" && !aiExpanded ? (
           <div className="onboarding-landing-view" data-node-id="361:26110">
-            {aiExpanded ? (
-              <div className="onboarding-landing-nav">
-                <OnboardingBackButton label="Back" onClick={handleBackFromAi} />
-              </div>
-            ) : null}
-
             <OnboardingLandingHeader />
 
             <div className="onboarding-split-layout">
-              <OnboardingAiTile
-                aiChatProps={aiChatProps}
-                expanded={aiExpanded}
-                onExpand={handleExpandAi}
-              />
-              {!aiExpanded ? <OnboardingTemplateTile onBrowseTemplates={handleBrowseTemplates} /> : null}
+              <OnboardingAiTile onExpand={handleExpandAi} />
+              <OnboardingTemplateTile onBrowseTemplates={handleBrowseTemplates} />
             </div>
+          </div>
+        ) : null}
+
+        {step === "landing" && aiExpanded ? (
+          <div className="onboarding-ai-prompts-view" data-node-id="379:26680">
+            <OnboardingBackButton label="Back" onClick={handleBackFromAi} />
+            <OnboardingAiPromptsHeader />
+            <OnboardingAiPromptCards onSelectPrompt={handleSelectAiPrompt} />
           </div>
         ) : null}
 

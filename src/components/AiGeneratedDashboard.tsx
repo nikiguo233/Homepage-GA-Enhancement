@@ -193,6 +193,7 @@ export function AiGeneratedDashboard({
   highlightedWidgetRefId,
   libraryWidgetIds = [],
   metricCardOrder = null,
+  showMetricCards = true,
   showWidgetSources = false,
   variant = "default",
   widgetRef,
@@ -203,6 +204,7 @@ export function AiGeneratedDashboard({
   highlightedWidgetRefId?: string | null;
   libraryWidgetIds?: DashboardWidgetId[];
   metricCardOrder?: string[] | null;
+  showMetricCards?: boolean;
   showWidgetSources?: boolean;
   variant?: AiGeneratedDashboardVariant;
   widgetRef?: RefObject<HTMLElement | null>;
@@ -220,32 +222,40 @@ export function AiGeneratedDashboard({
           ...defaultVisibleMetricCards.filter((card) => !metricCardOrder.includes(card.label)),
         ]
       : defaultVisibleMetricCards;
-  const showTrendChart = variant === "default";
-  const visibleLibraryWidgetIds = useMemo(
-    () => [
+  const showTrendChart = showMetricCards && variant === "default";
+  const addedDashboardWidgetIds = addedWidgetIds.filter(
+    (id): id is DashboardWidgetId => DASHBOARD_WIDGET_CATALOG.some((widget) => widget.id === id),
+  );
+  const visibleLibraryWidgetIds = useMemo(() => {
+    if (addedDashboardWidgetIds.length === 0) {
+      return libraryWidgetIds.filter((id): id is DashboardWidgetId =>
+        DASHBOARD_WIDGET_CATALOG.some((widget) => widget.id === id),
+      );
+    }
+
+    return [
       ...new Set([
         ...libraryWidgetIds,
-        ...addedWidgetIds.filter(
-          (id): id is DashboardWidgetId => DASHBOARD_WIDGET_CATALOG.some((widget) => widget.id === id),
-        ),
+        ...addedDashboardWidgetIds,
       ]),
-    ],
-    [addedWidgetIds, libraryWidgetIds],
-  );
+    ];
+  }, [addedDashboardWidgetIds, libraryWidgetIds]);
 
   return (
     <section className="ai-generated-dashboard" data-node-id="225:41367">
-      <div className={`ai-metric-grid${visibleMetricCards.length < 4 ? " ai-metric-grid-compact" : ""}`}>
-        {visibleMetricCards.map((card) => (
-          <AiMetricCard
-            change={card.change}
-            key={card.label}
-            label={card.label}
-            showSourceBadge={showWidgetSources}
-            value={card.value}
-          />
-        ))}
-      </div>
+      {showMetricCards ? (
+        <div className={`ai-metric-grid${visibleMetricCards.length < 4 ? " ai-metric-grid-compact" : ""}`}>
+          {visibleMetricCards.map((card) => (
+            <AiMetricCard
+              change={card.change}
+              key={card.label}
+              label={card.label}
+              showSourceBadge={showWidgetSources}
+              value={card.value}
+            />
+          ))}
+        </div>
+      ) : null}
       {showTrendChart ? <AiRevenueTrendChart showSourceBadge={showWidgetSources} /> : null}
       <AiAddedWidgets
         addedWidgetIds={addedWidgetIds}

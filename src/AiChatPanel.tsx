@@ -29,7 +29,7 @@ import type {
   ThinkingProcess,
   WidgetRecommendationSource,
 } from "./ai/types";
-import { AiChatHomepagePreview } from "./components/AiChatHomepagePreview";
+import { AiChatCleanupHomepagePreview, AiChatHomepagePreview } from "./components/AiChatHomepagePreview";
 import { AiChatCustomWidgetPreview } from "./components/AiChatCustomWidgetPreview";
 import { AiChatWidgetRecommendationPreview } from "./components/AiChatWidgetRecommendationPreview";
 import { WidgetSourceBadge } from "./components/WidgetSourceBadge";
@@ -68,10 +68,12 @@ function AiSuggestedActionButton({
 function AiChatEmptyState({
   intro,
   onSelectSuggestion,
+  showSuggestions = true,
   suggestions,
 }: {
   intro: string;
   onSelectSuggestion: (action: SuggestedAction) => void;
+  showSuggestions?: boolean;
   suggestions: SuggestedAction[];
 }) {
   return (
@@ -80,11 +82,13 @@ function AiChatEmptyState({
         <AiSparkIcon className="ai-chat-empty-state-spark" />
         <p>{intro}</p>
       </div>
-      <div className="ai-chat-suggested-actions">
-        {suggestions.map((action) => (
-          <AiSuggestedActionButton action={action} key={action.id} onSelect={onSelectSuggestion} />
-        ))}
-      </div>
+      {showSuggestions ? (
+        <div className="ai-chat-suggested-actions">
+          {suggestions.map((action) => (
+            <AiSuggestedActionButton action={action} key={action.id} onSelect={onSelectSuggestion} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -286,6 +290,9 @@ function AiChatCleanupProposal({
 
   return (
     <div className="ai-chat-cleanup-proposal">
+      <div className="ai-chat-cleanup-preview">
+        <AiChatCleanupHomepagePreview proposal={proposal} />
+      </div>
       {proposal.removals.length > 0 ? (
         <div className="ai-chat-cleanup-section">
           <h4>Moved down to prioritize top metrics</h4>
@@ -845,13 +852,14 @@ export function AiChatPanel({
             </header>
 
             <div className="ai-chat-panel-body">
-              {showEmptyState && showEmptyStateSuggestions ? (
+              {showEmptyState ? (
                 <AiChatEmptyState
                   intro={emptyStateIntro}
                   onSelectSuggestion={(action) => onSuggestedAction?.(action)}
+                  showSuggestions={showEmptyStateSuggestions}
                   suggestions={suggestions}
                 />
-              ) : !showEmptyState ? (
+              ) : (
                 <AiChatMessageList
                   messages={messages}
                   onAddRecommendedWidgets={(messageId, widgetIds) =>
@@ -872,7 +880,7 @@ export function AiChatPanel({
                   onViewSavedTemplate={onViewSavedTemplate}
                   thinkingProcess={thinkingProcess}
                 />
-              ) : null}
+              )}
             </div>
 
             <footer className="ai-chat-input-region">

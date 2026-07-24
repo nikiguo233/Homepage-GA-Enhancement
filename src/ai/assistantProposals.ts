@@ -86,7 +86,7 @@ function buildTopAccountsWidgetBase(): Omit<CustomWidgetDraft, "content" | "data
     access: "private",
     labelAsExternalContent: false,
     displayWidgetName: false,
-    embedSource: "",
+    embedSource: "tableau",
     embedAuthenticationMode: "shared-credentials",
     embedAuthenticationType: "",
     embedCredentials: {

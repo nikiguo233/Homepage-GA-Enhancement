@@ -37,6 +37,7 @@ import { EmbedWidgetConfigPanel } from "./EmbedWidgetConfigPanel";
 import { CustomWidgetCodeEditor } from "./CustomWidgetCodeEditor";
 import { EditorMoreMenu } from "./HomepageActionsMenu";
 import { DeleteConfirmModal, PublishConfirmModal } from "./CustomWidgetDashboardCard";
+import { AiButton } from "../AiButton";
 import { AiChatBadge } from "../../AiChatPanel";
 
 type EditorStep = "basic" | "configure";
@@ -514,20 +515,33 @@ export function CustomWidgetEditor({
       ) : (
         <div className="custom-widget-editor-configure">
           <div className="custom-widget-configure-header">
-            <button
-              className="custom-widget-toggle-code-button"
-              onClick={() => setShowCode((current) => !current)}
-              type="button"
-            >
-              <ChevronLeftIcon className={showCode ? "" : "is-flipped"} />
-              {showCode
-                ? draft.type === "embed"
-                  ? "Hide Configuration"
-                  : "Hide Code"
-                : draft.type === "embed"
-                  ? "Show Configuration"
-                  : "Show Code"}
-            </button>
+            <div className="custom-widget-configure-header-start">
+              <button
+                className="custom-widget-toggle-code-button"
+                onClick={() => setShowCode((current) => !current)}
+                type="button"
+              >
+                <ChevronLeftIcon className={showCode ? "" : "is-flipped"} />
+                {showCode
+                  ? draft.type === "embed"
+                    ? "Hide Configuration"
+                    : "Hide Code"
+                  : draft.type === "embed"
+                    ? "Show Configuration"
+                    : "Show Code"}
+              </button>
+              {showCode && draft.type === "html" && onOpenAiChat ? (
+                <AiButton
+                  background="light"
+                  className="custom-widget-generate-code-ai-button"
+                  onClick={onOpenAiChat}
+                  size="small"
+                  variant="secondary"
+                >
+                  Generate Code with AI
+                </AiButton>
+              ) : null}
+            </div>
             <div className="custom-widget-configure-header-controls">
               <div className="custom-widget-supported-sizes-field">
               <span className="custom-widget-supported-sizes-label">

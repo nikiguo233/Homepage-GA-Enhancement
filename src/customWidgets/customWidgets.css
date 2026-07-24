@@ -1183,6 +1183,41 @@
   flex-shrink: 0;
 }
 
+.custom-widget-configure-header-start {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+}
+
+.custom-widget-generate-code-ai-button {
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+}
+
+.custom-widget-generate-code-ai-button.occam-ai-button--secondary.occam-ai-button--light {
+  border: 0;
+  background: transparent;
+}
+
+.custom-widget-generate-code-ai-button .occam-ai-button__label {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: #0d4ac3;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.custom-widget-generate-code-ai-button:hover:not(:disabled),
+.custom-widget-generate-code-ai-button.occam-ai-button--secondary.occam-ai-button--light:hover:not(:disabled) {
+  background: rgba(13, 74, 195, 0.06);
+  filter: none;
+}
+
 .custom-widget-data-binding-banner {
   display: flex;
   flex-direction: column;
