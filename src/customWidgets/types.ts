@@ -8,6 +8,29 @@ export type EmbedAuthenticationMode = "shared-credentials" | "user-login-require
 export type EmbedAuthenticationType = "" | "oauth2" | "api-key" | "basic" | "saml";
 export type EmbedSource = "tableau";
 
+export type TableauShowHeaderOption = "on" | "off";
+
+export type TableauVisibleRole = "finance-viewer" | "billing-admin";
+
+export type TableauConnectionSettings = {
+  connectionName: string;
+  provider: string;
+  siteUrl: string;
+  clientId: string;
+  secretId: string;
+  connectedAppSecret: string;
+  userMapping: string;
+};
+
+export type TableauDashboardSettings = {
+  connectionName: string;
+  contextFilters: string;
+  defaultHeightPx: string;
+  displayName: string;
+  showTableauHeader: TableauShowHeaderOption;
+  visibleToRoles: TableauVisibleRole;
+};
+
 export type EmbedCredentials = {
   credential1: string;
   credential2: string;
@@ -42,8 +65,11 @@ export type CustomWidget = {
   embedAuthenticationMode: EmbedAuthenticationMode;
   embedAuthenticationType: EmbedAuthenticationType;
   embedCredentials: EmbedCredentials;
+  tableauConnection: TableauConnectionSettings;
+  tableauDashboard: TableauDashboardSettings;
   dataBinding?: WidgetDataBinding;
   isAiGenerated?: boolean;
+  createdBy?: string;
   status: CustomWidgetStatus;
   createdAt: string;
   updatedAt: string;

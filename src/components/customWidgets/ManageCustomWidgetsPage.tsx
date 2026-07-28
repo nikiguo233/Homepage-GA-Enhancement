@@ -3,6 +3,7 @@ import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 import Chip from "@mui/material/Chip";
 import Link from "@mui/material/Link";
 import Paper from "@mui/material/Paper";
+import Switch from "@mui/material/Switch";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -10,7 +11,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   CustomWidget,
   CustomWidgetHistoryAction,
@@ -22,13 +23,12 @@ import {
 } from "../../customWidgets/widgetHistory";
 import { ENABLE_CUSTOM_WIDGET_HISTORY_TAB } from "../../customWidgets/featureFlags";
 import { getWidgetGridPreviewSize } from "../../customWidgets/aiGeneratedMetricWidgets";
+import { isWidgetCreatedByCurrentUser } from "../../customWidgets/widgetCreator";
 import { ManagementBreadcrumbs } from "./ManagementBreadcrumbs";
 import { CreateWidgetDropdown, type CreateWidgetOption } from "./CreateWidgetDropdown";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 import { AiGeneratedChip } from "./AiGeneratedChip";
 import { DeleteConfirmModal, ClearHistoryConfirmModal } from "./CustomWidgetDashboardCard";
-
-export type ManageCustomWidgetsTab = "published" | "private" | "history";
 
 const historyHeaderCellSx = {
   color: "#575e63",
@@ -52,8 +52,8 @@ function getHistoryActionChipSx(action: CustomWidgetHistoryAction) {
 }
 
 export function ManageCustomWidgetsPage({
-  activeTab,
   historyEntries,
+  initialCreatedByMeOnly = false,
   onAddToHomepage,
   onClearHistory,
   onCreateWidgetOption,
@@ -61,13 +61,12 @@ export function ManageCustomWidgetsPage({
   onEditWidget,
   onGoHome,
   onGoHub,
-  onTabChange,
-  privateWidgets,
   publishedWidgets,
+  showHistory = false,
   widgets,
 }: {
-  activeTab: ManageCustomWidgetsTab;
   historyEntries: CustomWidgetHistoryEntry[];
+  initialCreatedByMeOnly?: boolean;
   onAddToHomepage: (widgetId: string) => void;
   onClearHistory: () => void;
   onCreateWidgetOption: (option: CreateWidgetOption) => void;
@@ -75,29 +74,35 @@ export function ManageCustomWidgetsPage({
   onEditWidget: (widgetId: string) => void;
   onGoHome: () => void;
   onGoHub: () => void;
-  onTabChange: (tab: ManageCustomWidgetsTab) => void;
-  privateWidgets: CustomWidget[];
   publishedWidgets: CustomWidget[];
+  showHistory?: boolean;
   widgets: CustomWidget[];
 }) {
   const [pendingDeleteWidgetId, setPendingDeleteWidgetId] = useState<string | null>(null);
   const [isClearHistoryOpen, setIsClearHistoryOpen] = useState(false);
-  const resolvedActiveTab =
-    !ENABLE_CUSTOM_WIDGET_HISTORY_TAB && activeTab === "history" ? "published" : activeTab;
-  const visibleWidgets =
-    resolvedActiveTab === "published"
-      ? publishedWidgets
-      : resolvedActiveTab === "private"
-        ? privateWidgets
-        : [];
-  const isWidgetTab = resolvedActiveTab === "published" || resolvedActiveTab === "private";
-  const isEmpty = isWidgetTab && visibleWidgets.length === 0;
+  const [createdByMeOnly, setCreatedByMeOnly] = useState(initialCreatedByMeOnly);
+  const resolvedShowHistory =
+    ENABLE_CUSTOM_WIDGET_HISTORY_TAB && showHistory;
+  const visibleWidgets = useMemo(() => {
+    if (resolvedShowHistory) {
+      return [];
+    }
+
+    if (!createdByMeOnly) {
+      return publishedWidgets;
+    }
+
+    return publishedWidgets.filter(isWidgetCreatedByCurrentUser);
+  }, [createdByMeOnly, publishedWidgets, resolvedShowHistory]);
+  const isEmpty = !resolvedShowHistory && visibleWidgets.length === 0;
   const isHistoryEmpty =
-    ENABLE_CUSTOM_WIDGET_HISTORY_TAB &&
-    resolvedActiveTab === "history" &&
-    historyEntries.length === 0;
+    resolvedShowHistory && historyEntries.length === 0;
   const pendingDeleteWidget = visibleWidgets.find((widget) => widget.id === pendingDeleteWidgetId);
   const widgetById = new Map(widgets.map((widget) => [widget.id, widget]));
+
+  useEffect(() => {
+    setCreatedByMeOnly(initialCreatedByMeOnly);
+  }, [initialCreatedByMeOnly]);
 
   return (
     <section className="custom-widget-management-page">
@@ -114,37 +119,18 @@ export function ManageCustomWidgetsPage({
           <CreateWidgetDropdown onSelect={onCreateWidgetOption} />
         </div>
       </div>
-      <div className="custom-widget-tabs" role="tablist">
-        <button
-          aria-selected={resolvedActiveTab === "published"}
-          className={`custom-widget-tab${resolvedActiveTab === "published" ? " is-active" : ""}`}
-          onClick={() => onTabChange("published")}
-          role="tab"
-          type="button"
-        >
-          Shared
-        </button>
-        <button
-          aria-selected={resolvedActiveTab === "private"}
-          className={`custom-widget-tab${resolvedActiveTab === "private" ? " is-active" : ""}`}
-          onClick={() => onTabChange("private")}
-          role="tab"
-          type="button"
-        >
-          Personal
-        </button>
-        {ENABLE_CUSTOM_WIDGET_HISTORY_TAB ? (
-          <button
-            aria-selected={resolvedActiveTab === "history"}
-            className={`custom-widget-tab${resolvedActiveTab === "history" ? " is-active" : ""}`}
-            onClick={() => onTabChange("history")}
-            role="tab"
-            type="button"
-          >
-            History
-          </button>
-        ) : null}
-      </div>
+      {!resolvedShowHistory ? (
+        <div className="custom-widget-management-toolbar">
+          <label className="custom-widget-created-by-me-toggle">
+            <Switch
+              checked={createdByMeOnly}
+              onChange={(event) => setCreatedByMeOnly(event.target.checked)}
+              size="small"
+            />
+            <span>Show only widgets created by me</span>
+          </label>
+        </div>
+      ) : null}
       {isEmpty ? (
         <div className="custom-widget-empty-state">
           <div className="custom-widget-empty-state-icon">
@@ -164,7 +150,7 @@ export function ManageCustomWidgetsPage({
           </p>
         </div>
       ) : null}
-      {isWidgetTab && !isEmpty ? (
+      {!resolvedShowHistory && !isEmpty ? (
         <div className="custom-widget-grid">
           {visibleWidgets.map((widget) => {
             const previewSize = getWidgetGridPreviewSize(widget);
@@ -192,7 +178,7 @@ export function ManageCustomWidgetsPage({
                     onClick={() => onAddToHomepage(widget.id)}
                     type="button"
                   >
-                    Add to Homepage
+                    Add to Home Page
                   </button>
                   <button
                     className="custom-widget-secondary-button custom-widget-grid-card-action"
@@ -209,7 +195,7 @@ export function ManageCustomWidgetsPage({
           })}
         </div>
       ) : null}
-      {ENABLE_CUSTOM_WIDGET_HISTORY_TAB && resolvedActiveTab === "history" && !isHistoryEmpty ? (
+      {resolvedShowHistory && !isHistoryEmpty ? (
         <div className="custom-widget-history-panel">
           <div className="custom-widget-history-toolbar">
             <p className="custom-widget-history-intro">

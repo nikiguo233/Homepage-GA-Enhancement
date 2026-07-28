@@ -30,7 +30,7 @@ import {
   sortWidgetSizes,
 } from "../../customWidgets/widgetSizes";
 import type { CustomWidgetDraft, CustomWidgetSize, CustomWidgetType } from "../../customWidgets/types";
-import { CUSTOM_WIDGET_ACCESS_OPTIONS, normalizeCustomWidgetAccess } from "../../customWidgets/widgetAccess";
+import { getCustomWidgetAccessDescription, normalizeCustomWidgetAccess } from "../../customWidgets/widgetAccess";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 import { WidgetEditorPreviewGrid } from "./WidgetEditorPreviewGrid";
 import { EmbedWidgetConfigPanel } from "./EmbedWidgetConfigPanel";
@@ -121,8 +121,7 @@ export function CustomWidgetEditor({
   const embedConfig = useMemo(() => normalizeEmbedConfig(draft), [draft]);
   const showEmbedPreview =
     draft.type === "embed" && Boolean(embedValidation?.valid) && draft.supportedSizes.length > 0;
-  const isTenantAccess = draft.access === "tenant";
-  const showAddToHomepageButton = Boolean(onAddToHomepage);
+  const showAddToHomepageButton = isEditing && Boolean(onAddToHomepage);
   const customSupportedSize = getCustomSupportedSize(draft.supportedSizes);
   const isCustomSizeEnabled = Boolean(customSupportedSize);
   const customSizeDimensions = customSupportedSize
@@ -177,16 +176,11 @@ export function CustomWidgetEditor({
   };
 
   const handleSave = () => {
-    if (isTenantAccess) {
-      setShowPublishConfirmModal(true);
-      return;
-    }
-
-    onSave(draft);
+    setShowPublishConfirmModal(true);
   };
 
   const handleConfirmSaveAndPublish = () => {
-    onSave(draft);
+    onSave({ ...draft, access: "tenant" });
     setShowPublishConfirmModal(false);
   };
 
@@ -341,11 +335,7 @@ export function CustomWidgetEditor({
           <span className="custom-widget-editor-brand">zuora</span>
           <div className="custom-widget-editor-title-group">
             <span className="custom-widget-editor-title">Custom Widget</span>
-            <span
-              className={`custom-widget-editor-status-chip${isTenantAccess ? " is-published" : ""}`}
-            >
-              {isTenantAccess ? "Shared" : "Personal"}
-            </span>
+            <span className="custom-widget-editor-status-chip is-published">Shared</span>
           </div>
         </div>
         <nav aria-label="Custom widget steps" className="custom-widget-editor-tabs">
@@ -373,7 +363,7 @@ export function CustomWidgetEditor({
               onClick={handleAddToHomepageClick}
               type="button"
             >
-              Add to Homepage
+              Add to Home Page
             </button>
           ) : null}
           <button
@@ -382,7 +372,7 @@ export function CustomWidgetEditor({
             onClick={handleSave}
             type="button"
           >
-            {isTenantAccess ? "Save and Publish" : "Save"}
+            Save and Publish
           </button>
           <div className="custom-widget-editor-more">
             <button
@@ -471,6 +461,10 @@ export function CustomWidgetEditor({
                 Maximum {MAX_DESCRIPTION_LENGTH} characters
               </span>
             </label>
+            <div className="custom-widget-field">
+              <span className="custom-widget-field-label">Access</span>
+              <p className="custom-widget-access-value">{getCustomWidgetAccessDescription()}</p>
+            </div>
             {ENABLE_LABEL_AS_EXTERNAL_CONTENT && draft.type === "embed" ? (
               <label className="custom-widget-checkbox-field">
                 <input
@@ -481,25 +475,6 @@ export function CustomWidgetEditor({
                 <span>Label as External Content</span>
               </label>
             ) : null}
-            <label className="custom-widget-field">
-              <span className="custom-widget-field-label">
-                Visibility <span className="custom-widget-required">*</span>
-              </span>
-              <select
-                onChange={(event) =>
-                  updateDraft({
-                    access: event.target.value as CustomWidgetDraft["access"],
-                  })
-                }
-                value={draft.access}
-              >
-                {CUSTOM_WIDGET_ACCESS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <div className="custom-widget-basic-actions">
               <button
                 className="custom-widget-primary-button"
@@ -641,29 +616,16 @@ export function CustomWidgetEditor({
                     </>
                   ) : (
                     <EmbedWidgetConfigPanel
-                      authenticationMode={embedConfig.embedAuthenticationMode}
-                      authenticationType={embedConfig.embedAuthenticationType}
-                      credentials={embedConfig.embedCredentials}
-                      embedSource={embedConfig.embedSource}
-                      embedUrl={draft.content}
-                      embedValidation={embedValidation}
+                      connection={embedConfig.tableauConnection}
                       isReadOnly={false}
-                      onAuthenticationModeChange={(embedAuthenticationMode) =>
-                        updateDraft({ embedAuthenticationMode })
-                      }
-                      onAuthenticationTypeChange={(embedAuthenticationType) =>
-                        updateDraft({ embedAuthenticationType })
-                      }
-                      onCredentialChange={(key, value) =>
+                      onConnectionChange={(patch) =>
                         updateDraft({
-                          embedCredentials: {
-                            ...embedConfig.embedCredentials,
-                            [key]: value,
+                          tableauConnection: {
+                            ...embedConfig.tableauConnection,
+                            ...patch,
                           },
                         })
                       }
-                      onEmbedSourceChange={(embedSource) => updateDraft({ embedSource })}
-                      onEmbedUrlChange={(content) => updateDraft({ content })}
                     />
                   )}
                 </div>
@@ -715,7 +677,7 @@ export function CustomWidgetEditor({
 
       {showPublishConfirmModal ? (
         <PublishConfirmModal
-          access={draft.access}
+          access="tenant"
           onCancel={() => setShowPublishConfirmModal(false)}
           onConfirm={handleConfirmSaveAndPublish}
         />

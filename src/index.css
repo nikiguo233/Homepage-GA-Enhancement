@@ -1020,7 +1020,7 @@ a {
 
 .notification-banner-compact .notification-banner-message {
   padding-right: 0;
-}
+}`
 
 .notification-banner-compact {
   padding-top: 8px;
@@ -5212,8 +5212,13 @@ a {
 
 .onboarding-screen-content--landing.is-ai-expanded {
   align-items: stretch;
-  width: min(913px, calc(100% - 48px));
+  width: min(1288px, calc(100% - 152px));
   margin-top: 64px;
+}
+
+.onboarding-ai-prompts-view .onboarding-ai-prompt-card-grid {
+  align-self: center;
+  width: min(913px, 100%);
 }
 
 .onboarding-ai-prompt-card-grid {
@@ -5800,7 +5805,7 @@ a {
 }
 
 .onboarding-screen-header--landing {
-  gap: 0;
+  gap: 16px;
   margin-bottom: 80px;
 }
 

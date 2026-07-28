@@ -2,6 +2,8 @@ import type { CustomWidget, CustomWidgetDraft, CustomWidgetHistoryAction } from 
 import { getWidgetSizeLabel } from "./widgetSizes";
 import { getCustomWidgetAccessLabel } from "./widgetAccess";
 
+export const CURRENT_WIDGET_ACTOR = "You";
+
 export function createHistoryId() {
   return `cwh-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -135,7 +137,7 @@ export function buildHistorySummary(
 
 export function buildHistoryEntry({
   action,
-  actor = "You",
+  actor = CURRENT_WIDGET_ACTOR,
   details = [],
   occurredAt,
   widgetId,
@@ -161,7 +163,7 @@ export function buildHistoryEntry({
 }
 
 export function buildSaveHistoryEntry({
-  actor = "You",
+  actor = CURRENT_WIDGET_ACTOR,
   draft,
   occurredAt,
   previous,

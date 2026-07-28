@@ -1,10 +1,7 @@
 import CloseIcon from "@mui/icons-material/Close";
-import { useEffect, useMemo, useState } from "react";
-import type { CustomWidget, CustomWidgetAccess } from "../../customWidgets/types";
-import {
-  CUSTOM_WIDGET_ACCESS_OPTIONS,
-  normalizeCustomWidgetAccess,
-} from "../../customWidgets/widgetAccess";
+import { useMemo, useState } from "react";
+import type { CustomWidget } from "../../customWidgets/types";
+import { getCustomWidgetAccessDescription } from "../../customWidgets/widgetAccess";
 import { getWidgetSizeLabel } from "../../customWidgets/widgetSizes";
 import { AiChatBadge } from "../../AiChatPanel";
 import { AiButton } from "../AiButton";
@@ -27,18 +24,11 @@ export function AiGeneratedWidgetEditor({
   onAddToHomepage?: () => void;
   onClose: () => void;
   onOpenAiChat?: () => void;
-  onSave: (access: CustomWidgetAccess) => void;
+  onSave: () => void;
   widget: CustomWidget;
 }) {
   const [step, setStep] = useState<EditorStep>(initialStep);
-  const [access, setAccess] = useState<CustomWidgetAccess>(() =>
-    normalizeCustomWidgetAccess(widget.access),
-  );
   const [showPublishConfirmModal, setShowPublishConfirmModal] = useState(false);
-
-  useEffect(() => {
-    setAccess(normalizeCustomWidgetAccess(widget.access));
-  }, [widget.access, widget.id]);
 
   const previewWidget = useMemo(
     () => ({
@@ -48,21 +38,12 @@ export function AiGeneratedWidgetEditor({
     [widget],
   );
 
-  const isPersonalAccess = access === "private";
-  const isTenantAccess = access === "tenant";
-  const showAddToHomepage = isPersonalAccess && Boolean(onAddToHomepage);
-
   const handleSave = () => {
-    if (isTenantAccess) {
-      setShowPublishConfirmModal(true);
-      return;
-    }
-
-    onSave(access);
+    setShowPublishConfirmModal(true);
   };
 
   const handleConfirmSaveAndPublish = () => {
-    onSave(access);
+    onSave();
     setShowPublishConfirmModal(false);
   };
 
@@ -81,11 +62,7 @@ export function AiGeneratedWidgetEditor({
           <span className="custom-widget-editor-brand">zuora</span>
           <div className="custom-widget-editor-title-group">
             <span className="custom-widget-editor-title">Custom Widget</span>
-            <span
-              className={`custom-widget-editor-status-chip${isTenantAccess ? " is-published" : ""}`}
-            >
-              {isTenantAccess ? "Shared" : "Personal"}
-            </span>
+            <span className="custom-widget-editor-status-chip is-published">Shared</span>
           </div>
         </div>
         <nav aria-label="Widget steps" className="custom-widget-editor-tabs">
@@ -114,13 +91,13 @@ export function AiGeneratedWidgetEditor({
           >
             Edit with AI
           </AiButton>
-          {showAddToHomepage ? (
+          {onAddToHomepage ? (
             <button
               className="custom-widget-editor-secondary-button"
               onClick={onAddToHomepage}
               type="button"
             >
-              Add to Homepage
+              Add to Home Page
             </button>
           ) : null}
           <button
@@ -128,7 +105,7 @@ export function AiGeneratedWidgetEditor({
             onClick={handleSave}
             type="button"
           >
-            {isTenantAccess ? "Save and Publish" : "Save"}
+            Save and Publish
           </button>
         </div>
       </header>
@@ -150,21 +127,10 @@ export function AiGeneratedWidgetEditor({
                 <dd>{widget.description || "—"}</dd>
               </div>
             </dl>
-            <label className="custom-widget-field">
-              <span className="custom-widget-field-label">Visibility</span>
-              <select
-                onChange={(event) =>
-                  setAccess(event.target.value as CustomWidgetAccess)
-                }
-                value={access}
-              >
-                {CUSTOM_WIDGET_ACCESS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="custom-widget-field">
+              <span className="custom-widget-field-label">Access</span>
+              <p className="custom-widget-access-value">{getCustomWidgetAccessDescription()}</p>
+            </div>
             <div className="custom-widget-basic-actions">
               <button
                 className="custom-widget-primary-button"
@@ -197,7 +163,7 @@ export function AiGeneratedWidgetEditor({
       )}
       {showPublishConfirmModal ? (
         <PublishConfirmModal
-          access={access}
+          access="tenant"
           onCancel={() => setShowPublishConfirmModal(false)}
           onConfirm={handleConfirmSaveAndPublish}
         />

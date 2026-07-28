@@ -145,7 +145,6 @@ type HomepageView =
   | "create-widget"
   | "edit-widget"
   | "edit-template";
-type ManageWidgetsTab = "published" | "private" | "history";
 
 const WIDGET_TYPES = [
   {
@@ -1766,7 +1765,7 @@ export function App() {
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateEditorReturnView, setTemplateEditorReturnView] =
     useState<Extract<HomepageView, "home" | "manage-templates">>("home");
-  const [manageWidgetsTab, setManageWidgetsTab] = useState<ManageWidgetsTab>("published");
+  const [manageWidgetsCreatedByMeOnly, setManageWidgetsCreatedByMeOnly] = useState(false);
   const [manageTemplatesTab, setManageTemplatesTab] = useState<ManageTemplatesTab>("published");
   const [homepageMenuOpen, setHomepageMenuOpen] = useState(false);
   const configureActionsRef = useRef<HTMLDivElement | null>(null);
@@ -1884,7 +1883,7 @@ export function App() {
     setEditingWidgetId(null);
     setAiSuggestedWidgetDraft(null);
     setAiSuggestedEditorStep(null);
-    setManageWidgetsTab("private");
+    setManageWidgetsCreatedByMeOnly(true);
     setHomepageView("manage-custom-widgets");
   }, [dismissFeedbackToast]);
 
@@ -1898,7 +1897,6 @@ export function App() {
         setEditingWidgetId(widgetId);
         setAiSuggestedWidgetDraft(null);
         setAiSuggestedEditorStep("basic");
-        setManageWidgetsTab("private");
         setHomepageView("edit-widget");
         return;
       }
@@ -1906,7 +1904,6 @@ export function App() {
       setEditingWidgetId(widgetId);
       setAiSuggestedWidgetDraft(null);
       setAiSuggestedEditorStep("configure");
-      setManageWidgetsTab("private");
       setHomepageView("edit-widget");
     },
     [dismissFeedbackToast, getWidgetById],
@@ -2129,6 +2126,7 @@ export function App() {
     setConfiguringCustomWidgetId(null);
     setWidgetDrawerConfigureEntry("select");
     setWidgetDrawerConfigureKind("revenue-progress");
+    setManageWidgetsCreatedByMeOnly(false);
     setHomepageView("manage-custom-widgets");
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
@@ -2140,6 +2138,7 @@ export function App() {
   }, [scrollRef]);
 
   const handleOpenManageCustomWidgets = useCallback(() => {
+    setManageWidgetsCreatedByMeOnly(false);
     setHomepageView("manage-custom-widgets");
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
@@ -2268,14 +2267,13 @@ export function App() {
       setEditingWidgetId(null);
       setAiSuggestedWidgetDraft(null);
       setAiSuggestedEditorStep(null);
-      setManageWidgetsTab(access === "private" ? "private" : "published");
+      setManageWidgetsCreatedByMeOnly(false);
       setHomepageView("manage-custom-widgets");
     },
     [editingWidgetId, saveWidget, showFeedbackToast],
   );
 
-  const handleSaveAiGeneratedWidget = useCallback(
-    (access: Parameters<typeof saveWidget>[0]["access"]) => {
+  const handleSaveAiGeneratedWidget = useCallback(() => {
       if (!editingWidgetId) {
         return;
       }
@@ -2286,7 +2284,7 @@ export function App() {
         return;
       }
 
-      handleSaveCustomWidget({ ...widget, access });
+      handleSaveCustomWidget({ ...widget, access: "tenant" });
     },
     [editingWidgetId, getWidgetById, handleSaveCustomWidget],
   );
@@ -2807,9 +2805,8 @@ export function App() {
           ) : null}
           {homepageView === "manage-custom-widgets" ? (
             <ManageCustomWidgetsPage
-              activeTab={manageWidgetsTab}
-              privateWidgets={privateWidgets}
               historyEntries={historyEntries}
+              initialCreatedByMeOnly={manageWidgetsCreatedByMeOnly}
               onAddToHomepage={handleAddPublishedWidgetToHomepage}
               onClearHistory={clearHistory}
               onCreateWidgetOption={handleCreateWidgetOption}
@@ -2817,7 +2814,6 @@ export function App() {
               onEditWidget={handleEditCustomWidget}
               onGoHome={handleGoHome}
               onGoHub={() => setHomepageView("manage-hub")}
-              onTabChange={setManageWidgetsTab}
               publishedWidgets={publishedWidgets}
               widgets={widgets}
             />
@@ -2855,6 +2851,8 @@ export function App() {
                     embedAuthenticationMode: editingWidget.embedAuthenticationMode,
                     embedAuthenticationType: editingWidget.embedAuthenticationType,
                     embedCredentials: editingWidget.embedCredentials,
+                    tableauConnection: editingWidget.tableauConnection,
+                    tableauDashboard: editingWidget.tableauDashboard,
                     dataBinding: editingWidget.dataBinding,
                     status: editingWidget.status,
                   }

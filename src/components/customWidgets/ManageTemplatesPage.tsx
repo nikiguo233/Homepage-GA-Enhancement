@@ -109,7 +109,7 @@ export function ManageTemplatesPage({
                       onClick={() => onAddToHomepage(template.id)}
                       type="button"
                     >
-                      Add to Homepage
+                      Add to Home Page
                     </button>
                   )}
                 </div>

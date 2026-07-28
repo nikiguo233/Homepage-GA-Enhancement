@@ -4,6 +4,7 @@ import {
   MONTH_END_CLOSE_DASHBOARD_RECOMMENDATIONS,
 } from "../ai/recommendationRationales";
 import type { CustomWidget, CustomWidgetDraft } from "./types";
+import { createDefaultEmbedConfig } from "./embedConfig";
 
 type AiMetricCardDefinition = {
   change: string;
@@ -178,18 +179,10 @@ function buildAiMetricCardWidgetDraft(metric: AiMetricCardDefinition): CustomWid
     content: buildAiMetricCardHtml(metric),
     size: "3x1",
     supportedSizes: ["3x1", "3x2"],
-    access: "private",
+    access: "tenant",
     labelAsExternalContent: false,
     displayWidgetName: false,
-    embedSource: "tableau",
-    embedAuthenticationMode: "shared-credentials",
-    embedAuthenticationType: "",
-    embedCredentials: {
-      credential1: "",
-      credential2: "",
-      credential3: "",
-      credential4: "",
-    },
+    ...createDefaultEmbedConfig(),
     isAiGenerated: true,
     status: "draft",
   };

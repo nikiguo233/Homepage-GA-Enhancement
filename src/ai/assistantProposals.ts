@@ -1,4 +1,5 @@
 import type { CustomWidgetDraft } from "../customWidgets/types";
+import { createDefaultEmbedConfig } from "../customWidgets/embedConfig";
 import {
   buildTopAccountsLiveWidgetHtml,
   DEFAULT_TOP_ACCOUNTS_DATA_BINDING,
@@ -86,15 +87,7 @@ function buildTopAccountsWidgetBase(): Omit<CustomWidgetDraft, "content" | "data
     access: "private",
     labelAsExternalContent: false,
     displayWidgetName: false,
-    embedSource: "tableau",
-    embedAuthenticationMode: "shared-credentials",
-    embedAuthenticationType: "",
-    embedCredentials: {
-      credential1: "",
-      credential2: "",
-      credential3: "",
-      credential4: "",
-    },
+    ...createDefaultEmbedConfig(),
   };
 }
 

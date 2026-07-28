@@ -28,6 +28,9 @@ function OnboardingLandingHeader() {
   return (
     <header className="onboarding-screen-header onboarding-screen-header--landing">
       <h1 className="onboarding-screen-title">Set Up Your Home Page</h1>
+      <p className="onboarding-screen-subtitle">
+        Build your own homepage using Zuora AI or choose a template to get started.
+      </p>
     </header>
   );
 }

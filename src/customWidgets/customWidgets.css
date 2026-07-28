@@ -242,6 +242,30 @@
   flex-shrink: 0;
 }
 
+.custom-widget-management-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.custom-widget-created-by-me-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: rgba(0, 0, 0, 0.9);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.custom-widget-created-by-me-toggle .MuiSwitch-root {
+  margin: 0;
+}
+
 .create-widget-dropdown {
   position: relative;
 }
@@ -948,6 +972,37 @@
   overflow: auto;
 }
 
+.custom-widget-embed-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.custom-widget-embed-config-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.custom-widget-embed-config-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.custom-widget-embed-config-success {
+  color: #1b5e20;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.custom-widget-embed-config-panel .custom-widget-field input[disabled][readonly] {
+  background: #f5f5f5;
+  color: #575e63;
+}
+
 .custom-widget-embed-config-panel .custom-widget-field select {
   width: 100%;
   min-height: 36px;
@@ -957,29 +1012,6 @@
   background: #fff;
   color: #575e63;
   font: inherit;
-}
-
-.custom-widget-embed-config-url {
-  width: 100%;
-  min-height: 80px;
-  padding: 8px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.6);
-  border-radius: 4px;
-  background: #fff;
-  color: #575e63;
-  font: inherit;
-  line-height: 18px;
-  resize: vertical;
-}
-
-.custom-widget-embed-config-url.is-invalid {
-  border-color: #b60f00;
-}
-
-.custom-widget-embed-config-error {
-  color: #b60f00;
-  font-size: 12px;
-  line-height: 18px;
 }
 
 .custom-widget-embed-config-fieldset {
@@ -1052,6 +1084,14 @@
   color: rgba(0, 0, 0, 0.6);
   font-size: 11px;
   line-height: 16px;
+}
+
+.custom-widget-access-value {
+  margin: 0;
+  color: #575e63;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
 }
 
 .custom-widget-type-grid {

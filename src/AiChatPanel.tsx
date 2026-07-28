@@ -247,7 +247,7 @@ function AiChatWidgetRecommendations({
         onClick={handleAdd}
         type="button"
       >
-        Add to homepage
+        Add to Home Page
       </button>
     </div>
   );
@@ -384,7 +384,7 @@ function AiChatCustomWidgetProposal({
               onClick={() => onSaveWidget?.(messageId, proposal)}
               type="button"
             >
-              Add to Homepage
+              Add to Home Page
             </button>
           )}
         </div>

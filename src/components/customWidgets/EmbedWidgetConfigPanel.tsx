@@ -1,151 +1,115 @@
-import type { EmbedUrlValidation } from "../../customWidgets/embedPolicy";
+import { useState, type ReactNode } from "react";
+import type { TableauConnectionSettings } from "../../customWidgets/types";
 import {
-  EMBED_AUTHENTICATION_TYPE_OPTIONS,
-  EMBED_SOURCE_OPTIONS,
-  getEmbedCredentialFieldLabels,
-  getEmbedUrlPlaceholder,
-  type EmbedAuthenticationMode,
-  type EmbedAuthenticationType,
-  type EmbedCredentials,
-  type EmbedSource,
+  TABLEAU_PROVIDER_LABEL,
 } from "../../customWidgets/embedConfig";
 
-export function EmbedWidgetConfigPanel({
-  authenticationMode,
-  authenticationType,
-  credentials,
-  embedSource,
-  embedUrl,
-  embedValidation,
-  isReadOnly,
-  onAuthenticationModeChange,
-  onAuthenticationTypeChange,
-  onCredentialChange,
-  onEmbedSourceChange,
-  onEmbedUrlChange,
+function EmbedConfigField({
+  children,
+  className = "",
+  label,
+  required = false,
 }: {
-  authenticationMode: EmbedAuthenticationMode;
-  authenticationType: EmbedAuthenticationType;
-  credentials: EmbedCredentials;
-  embedSource: EmbedSource;
-  embedUrl: string;
-  embedValidation: EmbedUrlValidation | null;
-  isReadOnly: boolean;
-  onAuthenticationModeChange: (mode: EmbedAuthenticationMode) => void;
-  onAuthenticationTypeChange: (type: EmbedAuthenticationType) => void;
-  onCredentialChange: (key: keyof EmbedCredentials, value: string) => void;
-  onEmbedSourceChange: (source: EmbedSource) => void;
-  onEmbedUrlChange: (value: string) => void;
+  children: ReactNode;
+  className?: string;
+  label: string;
+  required?: boolean;
 }) {
-  const showSharedCredentialFields = authenticationMode === "shared-credentials";
-  const credentialLabels = getEmbedCredentialFieldLabels(authenticationType);
-  const credentialKeys = ["credential1", "credential2", "credential3", "credential4"] as const;
-  const showEmbedUrlError =
-    embedUrl.trim().length > 0 && Boolean(embedValidation && !embedValidation.valid);
+  return (
+    <label className={["custom-widget-field", className].filter(Boolean).join(" ")}>
+      <span className="custom-widget-field-label">
+        {label}
+        {required ? <span className="custom-widget-required"> *</span> : null}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+export function EmbedWidgetConfigPanel({
+  connection,
+  isReadOnly,
+  onConnectionChange,
+}: {
+  connection: TableauConnectionSettings;
+  isReadOnly: boolean;
+  onConnectionChange: (patch: Partial<TableauConnectionSettings>) => void;
+}) {
+  const [connectionTestMessage, setConnectionTestMessage] = useState<string | null>(null);
+
+  const handleTestConnection = () => {
+    setConnectionTestMessage("Connection successful.");
+  };
 
   return (
     <div className="custom-widget-embed-config-panel">
-      <label className="custom-widget-field">
-        <span className="custom-widget-field-label">
-          Source <span className="custom-widget-required">*</span>
-        </span>
-        <select
-          disabled={isReadOnly}
-          onChange={(event) => onEmbedSourceChange(event.target.value as EmbedSource)}
-          value={embedSource}
-        >
-          {EMBED_SOURCE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <section className="custom-widget-embed-config-section">
+        <EmbedConfigField label="Provider" required>
+          <input disabled readOnly required type="text" value={TABLEAU_PROVIDER_LABEL} />
+        </EmbedConfigField>
 
-      <label className="custom-widget-field">
-        <span className="custom-widget-field-label">
-          Embed URL <span className="custom-widget-required">*</span>
-        </span>
-        <textarea
-          className={`custom-widget-embed-config-url${showEmbedUrlError ? " is-invalid" : ""}`}
-          disabled={isReadOnly}
-          onChange={(event) => onEmbedUrlChange(event.target.value)}
-          placeholder={getEmbedUrlPlaceholder(embedSource)}
-          rows={3}
-          spellCheck={false}
-          value={embedUrl}
-        />
-        {showEmbedUrlError ? (
-          <span className="custom-widget-embed-config-error">{embedValidation?.error}</span>
-        ) : null}
-      </label>
+        <EmbedConfigField label="Tableau View URL" required>
+          <input
+            disabled={isReadOnly}
+            onChange={(event) => onConnectionChange({ siteUrl: event.target.value })}
+            placeholder="https://10ay.online.tableau.com/views/RevenueDashboard/RevenueOverview"
+            required
+            type="url"
+            value={connection.siteUrl}
+          />
+        </EmbedConfigField>
 
-      <fieldset className="custom-widget-embed-config-fieldset">
-        <legend className="custom-widget-field-label">
-          Authentication Mode <span className="custom-widget-required">*</span>
-        </legend>
-        <div className="custom-widget-embed-config-radio-group" role="radiogroup">
-          <label className="custom-widget-embed-config-radio">
+        <div className="custom-widget-embed-config-row">
+          <EmbedConfigField label="Connected App Client ID" required>
             <input
-              checked={authenticationMode === "shared-credentials"}
               disabled={isReadOnly}
-              name="embed-authentication-mode"
-              onChange={() => onAuthenticationModeChange("shared-credentials")}
-              type="radio"
-              value="shared-credentials"
+              onChange={(event) => onConnectionChange({ clientId: event.target.value })}
+              placeholder="a1b2c3d4-****"
+              required
+              type="text"
+              value={connection.clientId}
             />
-            <span>Shared Credentials</span>
-          </label>
-          <label className="custom-widget-embed-config-radio">
+          </EmbedConfigField>
+
+          <EmbedConfigField label="Secret ID" required>
             <input
-              checked={authenticationMode === "user-login-required"}
               disabled={isReadOnly}
-              name="embed-authentication-mode"
-              onChange={() => onAuthenticationModeChange("user-login-required")}
-              type="radio"
-              value="user-login-required"
+              onChange={(event) => onConnectionChange({ secretId: event.target.value })}
+              placeholder="secret-id-****"
+              required
+              type="text"
+              value={connection.secretId}
             />
-            <span>User Login Required</span>
-          </label>
+          </EmbedConfigField>
         </div>
-      </fieldset>
 
-      {showSharedCredentialFields ? (
-        <>
-          <label className="custom-widget-field">
-            <span className="custom-widget-field-label">
-              Authentication Type <span className="custom-widget-required">*</span>
+        <EmbedConfigField label="Connected App secret" required>
+          <input
+            autoComplete="off"
+            disabled={isReadOnly}
+            onChange={(event) => onConnectionChange({ connectedAppSecret: event.target.value })}
+            required
+            type="password"
+            value={connection.connectedAppSecret}
+          />
+        </EmbedConfigField>
+
+        <div className="custom-widget-embed-config-section-actions">
+          <button
+            className="custom-widget-secondary-button"
+            disabled={isReadOnly}
+            onClick={handleTestConnection}
+            type="button"
+          >
+            Test connection
+          </button>
+          {connectionTestMessage ? (
+            <span className="custom-widget-embed-config-success" role="status">
+              {connectionTestMessage}
             </span>
-            <select
-              disabled={isReadOnly}
-              onChange={(event) =>
-                onAuthenticationTypeChange(event.target.value as EmbedAuthenticationType)
-              }
-              value={authenticationType}
-            >
-              {EMBED_AUTHENTICATION_TYPE_OPTIONS.map((option) => (
-                <option key={option.value || "placeholder"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {authenticationType
-            ? credentialKeys.map((key, index) => (
-                <label className="custom-widget-field" key={key}>
-                  <span className="custom-widget-field-label">{credentialLabels[index]}</span>
-                  <input
-                    disabled={isReadOnly}
-                    onChange={(event) => onCredentialChange(key, event.target.value)}
-                    type="text"
-                    value={credentials[key]}
-                  />
-                </label>
-              ))
-            : null}
-        </>
-      ) : null}
+          ) : null}
+        </div>
+      </section>
     </div>
   );
 }

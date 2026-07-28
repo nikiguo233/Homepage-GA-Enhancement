@@ -9,7 +9,7 @@ import type {
   CustomWidgetHistoryEntry,
   CustomWidgetType,
 } from "./types";
-import { buildHistoryEntry, buildSaveHistoryEntry } from "./widgetHistory";
+import { buildHistoryEntry, buildSaveHistoryEntry, CURRENT_WIDGET_ACTOR } from "./widgetHistory";
 import { normalizeCustomWidgetAccess } from "./widgetAccess";
 import { normalizeWidgetDataBinding } from "./widgetDataBinding";
 import { DEFAULT_SUPPORTED_WIDGET_SIZES, normalizeSupportedWidgetSizes, normalizeWidgetSize } from "./widgetSizes";
@@ -41,6 +41,7 @@ function loadWidgets(): CustomWidget[] {
             labelAsExternalContent: Boolean(widget.labelAsExternalContent),
             displayWidgetName: Boolean(widget.displayWidgetName),
             isAiGenerated: isAiGeneratedCustomWidget(widget),
+            createdBy: widget.createdBy ?? CURRENT_WIDGET_ACTOR,
             ...normalizeEmbedConfig(widget),
             dataBinding: normalizeWidgetDataBinding(widget),
           });
@@ -90,7 +91,7 @@ export function createEmptyCustomWidgetDraft(
     content: type === "html" ? DEFAULT_CUSTOM_WIDGET_HTML : DEFAULT_EMBED_URL,
     size: "3x3",
     supportedSizes: [...DEFAULT_SUPPORTED_WIDGET_SIZES],
-    access: "private",
+    access: "tenant",
     labelAsExternalContent: type === "embed",
     displayWidgetName: false,
     ...createDefaultEmbedConfig(),
@@ -133,6 +134,7 @@ export function useCustomWidgets() {
             ? {
                 ...widget,
                 ...draft,
+                createdBy: widget.createdBy ?? CURRENT_WIDGET_ACTOR,
                 status: draft.status ?? widget.status,
                 updatedAt: now,
               }
@@ -155,8 +157,11 @@ export function useCustomWidgets() {
         embedAuthenticationType: draft.embedAuthenticationType,
         embedCredentials: draft.embedCredentials,
         embedSource: draft.embedSource,
+        tableauConnection: draft.tableauConnection,
+        tableauDashboard: draft.tableauDashboard,
         dataBinding: draft.dataBinding,
         isAiGenerated: draft.isAiGenerated ?? false,
+        createdBy: CURRENT_WIDGET_ACTOR,
         status: draft.status ?? "draft",
         createdAt: now,
         updatedAt: now,
