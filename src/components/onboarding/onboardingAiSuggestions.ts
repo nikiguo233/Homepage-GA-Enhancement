@@ -19,11 +19,10 @@ export const ONBOARDING_AI_PROMPTS: OnboardingAiPrompt[] = [
     description: "Recommend personalized widget suggestions based on my usage patterns and preferences",
   },
   {
-    id: "month-end-close",
-    label: "Build me a month-end close dashboard",
-    prompt: "Build me a month-end close dashboard.",
-    description:
-      "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor.",
+    id: "build-widget",
+    label: "Build a widget for me",
+    prompt: "Create a table widget of the top 10 accounts by open balance.",
+    description: "Create a table widget of the top 10 accounts by open balance.",
   },
   {
     id: "suggested-prompt",

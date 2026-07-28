@@ -6,6 +6,8 @@ import {
   getHomepageConfigAssistantResponse,
   getHomepageConfigRegenerateResponse,
   getSuggestionsForContext,
+  isPublishWidgetPrompt,
+  isUnpublishWidgetPrompt,
 } from "./homepageConfigAssistant";
 import {
   getThinkingModeForPrompt,
@@ -13,9 +15,11 @@ import {
   THINKING_STEP_LABELS,
   type ThinkingMode,
 } from "./thinkingSteps";
+import type { CustomWidgetAccess } from "../customWidgets/types";
 import type {
   AiChatSuggestionContext,
   AiGeneratedDashboardVariant,
+  AssistantResponse,
   ChatMessage,
   ChatPreview,
   CustomWidgetProposal,
@@ -79,7 +83,11 @@ export function useAiHomepageConfigChat(options: {
   onApplyCleanup?: (plan: HomepageCleanupPlan) => void;
   onApplyPreview?: (preview?: ChatPreview) => void;
   onSaveProposedTeamTemplate?: (proposal: TeamTemplateProposal) => string | undefined;
-  onSaveProposedCustomWidget?: (proposal: CustomWidgetProposal) => string | undefined;
+  onSaveProposedCustomWidget?: (
+    proposal: CustomWidgetProposal,
+    access?: CustomWidgetAccess,
+  ) => string | undefined;
+  onAiGeneratedWidgetAccessChange?: (access: CustomWidgetAccess) => AssistantResponse | null;
   onUndoCleanup?: () => void;
   onUndoPreview?: () => void;
   removedWidgetIds: DashboardWidgetId[];
@@ -196,20 +204,58 @@ export function useAiHomepageConfigChat(options: {
         return;
       }
 
-      const response = getHomepageConfigAssistantResponse(prompt, {
-        addedWidgetIds: options.addedWidgetIds,
-        aiDashboardVariant: options.aiDashboardVariant,
-        aiLibraryWidgetIds: options.aiLibraryWidgetIds,
-        extraExcludedWidgetIds: options.extraExcludedWidgetIds,
-        hiddenMetricCardLabels: options.hiddenMetricCardLabels,
-        isAiGenerated: options.isAiGenerated,
-        isEmptyHomepage: options.isEmptyHomepage,
-        layout: options.layout,
-        metricCardOrder: options.metricCardOrder,
-        removedWidgetIds: options.removedWidgetIds,
-        revenueProgressAdded: options.revenueProgressAdded,
-        widgetOrder: options.widgetOrder,
-      });
+      let response: AssistantResponse;
+
+      if (isPublishWidgetPrompt(prompt)) {
+        response =
+          options.onAiGeneratedWidgetAccessChange?.("tenant") ??
+          getHomepageConfigAssistantResponse(prompt, {
+            addedWidgetIds: options.addedWidgetIds,
+            aiDashboardVariant: options.aiDashboardVariant,
+            aiLibraryWidgetIds: options.aiLibraryWidgetIds,
+            extraExcludedWidgetIds: options.extraExcludedWidgetIds,
+            hiddenMetricCardLabels: options.hiddenMetricCardLabels,
+            isAiGenerated: options.isAiGenerated,
+            isEmptyHomepage: options.isEmptyHomepage,
+            layout: options.layout,
+            metricCardOrder: options.metricCardOrder,
+            removedWidgetIds: options.removedWidgetIds,
+            revenueProgressAdded: options.revenueProgressAdded,
+            widgetOrder: options.widgetOrder,
+          });
+      } else if (isUnpublishWidgetPrompt(prompt)) {
+        response =
+          options.onAiGeneratedWidgetAccessChange?.("private") ??
+          getHomepageConfigAssistantResponse(prompt, {
+            addedWidgetIds: options.addedWidgetIds,
+            aiDashboardVariant: options.aiDashboardVariant,
+            aiLibraryWidgetIds: options.aiLibraryWidgetIds,
+            extraExcludedWidgetIds: options.extraExcludedWidgetIds,
+            hiddenMetricCardLabels: options.hiddenMetricCardLabels,
+            isAiGenerated: options.isAiGenerated,
+            isEmptyHomepage: options.isEmptyHomepage,
+            layout: options.layout,
+            metricCardOrder: options.metricCardOrder,
+            removedWidgetIds: options.removedWidgetIds,
+            revenueProgressAdded: options.revenueProgressAdded,
+            widgetOrder: options.widgetOrder,
+          });
+      } else {
+        response = getHomepageConfigAssistantResponse(prompt, {
+          addedWidgetIds: options.addedWidgetIds,
+          aiDashboardVariant: options.aiDashboardVariant,
+          aiLibraryWidgetIds: options.aiLibraryWidgetIds,
+          extraExcludedWidgetIds: options.extraExcludedWidgetIds,
+          hiddenMetricCardLabels: options.hiddenMetricCardLabels,
+          isAiGenerated: options.isAiGenerated,
+          isEmptyHomepage: options.isEmptyHomepage,
+          layout: options.layout,
+          metricCardOrder: options.metricCardOrder,
+          removedWidgetIds: options.removedWidgetIds,
+          revenueProgressAdded: options.revenueProgressAdded,
+          widgetOrder: options.widgetOrder,
+        });
+      }
 
       setThinkingProcess(null);
       setMessages((current) => [
@@ -241,6 +287,7 @@ export function useAiHomepageConfigChat(options: {
       options.removedWidgetIds,
       options.revenueProgressAdded,
       options.widgetOrder,
+      options.onAiGeneratedWidgetAccessChange,
     ],
   );
 
@@ -421,12 +468,12 @@ export function useAiHomepageConfigChat(options: {
   );
 
   const handleSaveProposedCustomWidget = useCallback(
-    (messageId: string, proposal: CustomWidgetProposal) => {
+    (messageId: string, proposal: CustomWidgetProposal, access?: CustomWidgetAccess) => {
       if (!proposal.supportsLiveData) {
         return;
       }
 
-      const widgetId = options.onSaveProposedCustomWidget?.(proposal);
+      const widgetId = options.onSaveProposedCustomWidget?.(proposal, access);
 
       setMessages((current) =>
         current.map((message) =>
@@ -434,6 +481,7 @@ export function useAiHomepageConfigChat(options: {
             ? {
                 ...message,
                 customWidgetSaved: true,
+                customWidgetSavedAccess: access,
                 proposedCustomWidgetId: widgetId ?? message.proposedCustomWidgetId,
               }
             : message,

@@ -4463,6 +4463,18 @@ a {
   align-items: stretch;
 }
 
+.ai-chat-assistant-proposal-actions-library {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.ai-chat-assistant-proposal-actions-library .ai-chat-preview-regenerate,
+.ai-chat-assistant-proposal-actions-library .ai-chat-preview-apply {
+  flex: 1;
+  width: auto;
+}
+
 .ai-chat-assistant-proposal-actions-stacked .ai-chat-preview-apply,
 .ai-chat-assistant-proposal-actions-stacked .ai-chat-preview-regenerate,
 .ai-chat-assistant-proposal-actions-stacked .ai-chat-preview-undo {

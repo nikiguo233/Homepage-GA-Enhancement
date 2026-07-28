@@ -91,7 +91,7 @@ export function createEmptyCustomWidgetDraft(
     content: type === "html" ? DEFAULT_CUSTOM_WIDGET_HTML : DEFAULT_EMBED_URL,
     size: "3x3",
     supportedSizes: [...DEFAULT_SUPPORTED_WIDGET_SIZES],
-    access: "tenant",
+    access: "private",
     labelAsExternalContent: type === "embed",
     displayWidgetName: false,
     ...createDefaultEmbedConfig(),

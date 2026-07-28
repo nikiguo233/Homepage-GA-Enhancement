@@ -179,7 +179,7 @@ function buildAiMetricCardWidgetDraft(metric: AiMetricCardDefinition): CustomWid
     content: buildAiMetricCardHtml(metric),
     size: "3x1",
     supportedSizes: ["3x1", "3x2"],
-    access: "tenant",
+    access: "private",
     labelAsExternalContent: false,
     displayWidgetName: false,
     ...createDefaultEmbedConfig(),

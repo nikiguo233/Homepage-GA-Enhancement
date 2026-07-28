@@ -3,7 +3,6 @@ import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 import Chip from "@mui/material/Chip";
 import Link from "@mui/material/Link";
 import Paper from "@mui/material/Paper";
-import Switch from "@mui/material/Switch";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -11,7 +10,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   CustomWidget,
   CustomWidgetHistoryAction,
@@ -23,12 +22,13 @@ import {
 } from "../../customWidgets/widgetHistory";
 import { ENABLE_CUSTOM_WIDGET_HISTORY_TAB } from "../../customWidgets/featureFlags";
 import { getWidgetGridPreviewSize } from "../../customWidgets/aiGeneratedMetricWidgets";
-import { isWidgetCreatedByCurrentUser } from "../../customWidgets/widgetCreator";
 import { ManagementBreadcrumbs } from "./ManagementBreadcrumbs";
 import { CreateWidgetDropdown, type CreateWidgetOption } from "./CreateWidgetDropdown";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 import { AiGeneratedChip } from "./AiGeneratedChip";
 import { DeleteConfirmModal, ClearHistoryConfirmModal } from "./CustomWidgetDashboardCard";
+
+export type ManageCustomWidgetsViewTab = "shared" | "my";
 
 const historyHeaderCellSx = {
   color: "#575e63",
@@ -52,35 +52,36 @@ function getHistoryActionChipSx(action: CustomWidgetHistoryAction) {
 }
 
 export function ManageCustomWidgetsPage({
+  activeTab,
   historyEntries,
-  initialCreatedByMeOnly = false,
-  onAddToHomepage,
   onClearHistory,
   onCreateWidgetOption,
   onDeleteWidget,
   onEditWidget,
   onGoHome,
   onGoHub,
+  onTabChange,
+  privateWidgets,
   publishedWidgets,
   showHistory = false,
   widgets,
 }: {
+  activeTab: ManageCustomWidgetsViewTab;
   historyEntries: CustomWidgetHistoryEntry[];
-  initialCreatedByMeOnly?: boolean;
-  onAddToHomepage: (widgetId: string) => void;
   onClearHistory: () => void;
   onCreateWidgetOption: (option: CreateWidgetOption) => void;
   onDeleteWidget: (widgetId: string) => void;
   onEditWidget: (widgetId: string) => void;
   onGoHome: () => void;
   onGoHub: () => void;
+  onTabChange: (tab: ManageCustomWidgetsViewTab) => void;
+  privateWidgets: CustomWidget[];
   publishedWidgets: CustomWidget[];
   showHistory?: boolean;
   widgets: CustomWidget[];
 }) {
   const [pendingDeleteWidgetId, setPendingDeleteWidgetId] = useState<string | null>(null);
   const [isClearHistoryOpen, setIsClearHistoryOpen] = useState(false);
-  const [createdByMeOnly, setCreatedByMeOnly] = useState(initialCreatedByMeOnly);
   const resolvedShowHistory =
     ENABLE_CUSTOM_WIDGET_HISTORY_TAB && showHistory;
   const visibleWidgets = useMemo(() => {
@@ -88,21 +89,17 @@ export function ManageCustomWidgetsPage({
       return [];
     }
 
-    if (!createdByMeOnly) {
+    if (activeTab === "shared") {
       return publishedWidgets;
     }
 
-    return publishedWidgets.filter(isWidgetCreatedByCurrentUser);
-  }, [createdByMeOnly, publishedWidgets, resolvedShowHistory]);
+    return privateWidgets;
+  }, [activeTab, privateWidgets, publishedWidgets, resolvedShowHistory]);
   const isEmpty = !resolvedShowHistory && visibleWidgets.length === 0;
   const isHistoryEmpty =
     resolvedShowHistory && historyEntries.length === 0;
   const pendingDeleteWidget = visibleWidgets.find((widget) => widget.id === pendingDeleteWidgetId);
   const widgetById = new Map(widgets.map((widget) => [widget.id, widget]));
-
-  useEffect(() => {
-    setCreatedByMeOnly(initialCreatedByMeOnly);
-  }, [initialCreatedByMeOnly]);
 
   return (
     <section className="custom-widget-management-page">
@@ -120,15 +117,25 @@ export function ManageCustomWidgetsPage({
         </div>
       </div>
       {!resolvedShowHistory ? (
-        <div className="custom-widget-management-toolbar">
-          <label className="custom-widget-created-by-me-toggle">
-            <Switch
-              checked={createdByMeOnly}
-              onChange={(event) => setCreatedByMeOnly(event.target.checked)}
-              size="small"
-            />
-            <span>Show only widgets created by me</span>
-          </label>
+        <div className="custom-widget-tabs" role="tablist">
+          <button
+            aria-selected={activeTab === "shared"}
+            className={`custom-widget-tab${activeTab === "shared" ? " is-active" : ""}`}
+            onClick={() => onTabChange("shared")}
+            role="tab"
+            type="button"
+          >
+            Published Widgets
+          </button>
+          <button
+            aria-selected={activeTab === "my"}
+            className={`custom-widget-tab${activeTab === "my" ? " is-active" : ""}`}
+            onClick={() => onTabChange("my")}
+            role="tab"
+            type="button"
+          >
+            Personal Widgets
+          </button>
         </div>
       ) : null}
       {isEmpty ? (
@@ -172,13 +179,6 @@ export function ManageCustomWidgetsPage({
                     type="button"
                   >
                     View Details
-                  </button>
-                  <button
-                    className="custom-widget-secondary-button custom-widget-grid-card-action"
-                    onClick={() => onAddToHomepage(widget.id)}
-                    type="button"
-                  >
-                    Add to Home Page
                   </button>
                   <button
                     className="custom-widget-secondary-button custom-widget-grid-card-action"

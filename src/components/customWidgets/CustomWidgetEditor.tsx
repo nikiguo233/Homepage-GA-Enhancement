@@ -30,13 +30,13 @@ import {
   sortWidgetSizes,
 } from "../../customWidgets/widgetSizes";
 import type { CustomWidgetDraft, CustomWidgetSize, CustomWidgetType } from "../../customWidgets/types";
-import { getCustomWidgetAccessDescription, normalizeCustomWidgetAccess } from "../../customWidgets/widgetAccess";
+import { normalizeCustomWidgetAccess } from "../../customWidgets/widgetAccess";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 import { WidgetEditorPreviewGrid } from "./WidgetEditorPreviewGrid";
 import { EmbedWidgetConfigPanel } from "./EmbedWidgetConfigPanel";
 import { CustomWidgetCodeEditor } from "./CustomWidgetCodeEditor";
 import { EditorMoreMenu } from "./HomepageActionsMenu";
-import { DeleteConfirmModal, PublishConfirmModal } from "./CustomWidgetDashboardCard";
+import { DeleteConfirmModal, PublishConfirmModal, UnpublishConfirmModal } from "./CustomWidgetDashboardCard";
 import { AiButton } from "../AiButton";
 import { AiChatBadge } from "../../AiChatPanel";
 
@@ -59,7 +59,6 @@ export function CustomWidgetEditor({
   initialDraft,
   initialStep = "basic",
   isEditing,
-  onAddToHomepage,
   onClose,
   onDelete,
   onOpenAiChat,
@@ -70,7 +69,6 @@ export function CustomWidgetEditor({
   initialDraft: CustomWidgetDraft;
   initialStep?: EditorStep;
   isEditing: boolean;
-  onAddToHomepage?: (draft: CustomWidgetDraft) => void;
   onClose: () => void;
   onDelete?: () => void;
   onOpenAiChat?: () => void;
@@ -85,6 +83,7 @@ export function CustomWidgetEditor({
   }));
   const [showCode, setShowCode] = useState(true);
   const [showPublishConfirmModal, setShowPublishConfirmModal] = useState(false);
+  const [showUnpublishConfirmModal, setShowUnpublishConfirmModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -121,7 +120,7 @@ export function CustomWidgetEditor({
   const embedConfig = useMemo(() => normalizeEmbedConfig(draft), [draft]);
   const showEmbedPreview =
     draft.type === "embed" && Boolean(embedValidation?.valid) && draft.supportedSizes.length > 0;
-  const showAddToHomepageButton = isEditing && Boolean(onAddToHomepage);
+  const isTenantAccess = normalizeCustomWidgetAccess(draft.access) === "tenant";
   const customSupportedSize = getCustomSupportedSize(draft.supportedSizes);
   const isCustomSizeEnabled = Boolean(customSupportedSize);
   const customSizeDimensions = customSupportedSize
@@ -175,26 +174,31 @@ export function CustomWidgetEditor({
     });
   };
 
-  const handleSave = () => {
+  const handleSaveForPersonalUse = () => {
+    onSave({ ...draft, access: "private" });
+  };
+
+  const handlePublish = () => {
     setShowPublishConfirmModal(true);
   };
 
-  const handleConfirmSaveAndPublish = () => {
+  const handleUnpublish = () => {
+    setShowUnpublishConfirmModal(true);
+  };
+
+  const handleConfirmPublish = () => {
     onSave({ ...draft, access: "tenant" });
     setShowPublishConfirmModal(false);
+  };
+
+  const handleConfirmUnpublish = () => {
+    onSave({ ...draft, access: "private" });
+    setShowUnpublishConfirmModal(false);
   };
 
   const handleDelete = () => {
     onDelete?.();
     setShowDeleteModal(false);
-  };
-
-  const handleAddToHomepageClick = () => {
-    if (!canAccessConfigure || !onAddToHomepage) {
-      return;
-    }
-
-    onAddToHomepage(draft);
   };
 
   const handleCopyCode = async () => {
@@ -335,7 +339,11 @@ export function CustomWidgetEditor({
           <span className="custom-widget-editor-brand">zuora</span>
           <div className="custom-widget-editor-title-group">
             <span className="custom-widget-editor-title">Custom Widget</span>
-            <span className="custom-widget-editor-status-chip is-published">Shared</span>
+            <span
+              className={`custom-widget-editor-status-chip${isTenantAccess ? " is-published" : ""}`}
+            >
+              {isTenantAccess ? "Published" : "Personal"}
+            </span>
           </div>
         </div>
         <nav aria-label="Custom widget steps" className="custom-widget-editor-tabs">
@@ -356,23 +364,23 @@ export function CustomWidgetEditor({
           </button>
         </nav>
         <div className="custom-widget-editor-header-actions">
-          {showAddToHomepageButton ? (
+          {!isTenantAccess ? (
             <button
               className="custom-widget-editor-secondary-button"
-              disabled={!canAccessConfigure}
-              onClick={handleAddToHomepageClick}
+              disabled={!canSave}
+              onClick={handleSaveForPersonalUse}
               type="button"
             >
-              Add to Home Page
+              Save for Personal Use
             </button>
           ) : null}
           <button
             className="custom-widget-editor-primary-button"
-            disabled={!canSave}
-            onClick={handleSave}
+            disabled={isTenantAccess ? false : !canSave}
+            onClick={isTenantAccess ? handleUnpublish : handlePublish}
             type="button"
           >
-            Save and Publish
+            {isTenantAccess ? "Unpublish Widget" : "Publish Widget"}
           </button>
           <div className="custom-widget-editor-more">
             <button
@@ -461,10 +469,6 @@ export function CustomWidgetEditor({
                 Maximum {MAX_DESCRIPTION_LENGTH} characters
               </span>
             </label>
-            <div className="custom-widget-field">
-              <span className="custom-widget-field-label">Access</span>
-              <p className="custom-widget-access-value">{getCustomWidgetAccessDescription()}</p>
-            </div>
             {ENABLE_LABEL_AS_EXTERNAL_CONTENT && draft.type === "embed" ? (
               <label className="custom-widget-checkbox-field">
                 <input
@@ -678,8 +682,16 @@ export function CustomWidgetEditor({
       {showPublishConfirmModal ? (
         <PublishConfirmModal
           access="tenant"
+          confirmLabel="Publish Widget"
           onCancel={() => setShowPublishConfirmModal(false)}
-          onConfirm={handleConfirmSaveAndPublish}
+          onConfirm={handleConfirmPublish}
+        />
+      ) : null}
+      {showUnpublishConfirmModal ? (
+        <UnpublishConfirmModal
+          access="tenant"
+          onCancel={() => setShowUnpublishConfirmModal(false)}
+          onConfirm={handleConfirmUnpublish}
         />
       ) : null}
       {showDeleteModal ? (

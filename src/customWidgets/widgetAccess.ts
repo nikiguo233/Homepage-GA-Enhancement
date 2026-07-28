@@ -20,16 +20,12 @@ export function getCustomWidgetAccessLabel(access: CustomWidgetAccess | undefine
   );
 }
 
-export function getCustomWidgetAccessDescription(_access?: CustomWidgetAccess) {
-  return `Shared - Visible to all users in current tenant (${CUSTOM_WIDGET_TENANT_ID})`;
+export function getCustomWidgetVisibilityChipLabel(access: CustomWidgetAccess | undefined) {
+  return normalizeCustomWidgetAccess(access) === "tenant" ? "Published" : "Personal";
 }
 
-export function getCustomWidgetVisibilityChipLabel(_access?: CustomWidgetAccess) {
-  return "Shared";
-}
-
-export function normalizeCustomWidgetAccess(_access: unknown): CustomWidgetAccess {
-  return "tenant";
+export function normalizeCustomWidgetAccess(access: unknown): CustomWidgetAccess {
+  return access === "tenant" ? "tenant" : "private";
 }
 
 export function getCustomWidgetSavedStatus(

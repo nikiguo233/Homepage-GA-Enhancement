@@ -190,6 +190,37 @@ function isCollectionsTemplatePrompt(text: string) {
   return normalized.includes("collections") && normalized.includes("template");
 }
 
+export function isPublishWidgetPrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return normalized === "publish this widget" || normalized === "publish widget";
+}
+
+export function isUnpublishWidgetPrompt(text: string) {
+  const normalized = text.trim().toLowerCase();
+
+  return normalized === "unpublish this widget" || normalized === "unpublish widget";
+}
+
+export function getAiGeneratedWidgetAccessChatResponse(
+  access: "private" | "tenant",
+  widgetName: string,
+): AssistantResponse {
+  const label = widgetName.trim() || "Untitled Widget";
+
+  if (access === "tenant") {
+    return {
+      message: `"${label}" has been published. It is now available to all users in your tenant under Shared Widgets.`,
+      showFeedback: false,
+    };
+  }
+
+  return {
+    message: `"${label}" has been unpublished and moved to My Widgets for personal use.`,
+    showFeedback: false,
+  };
+}
+
 function buildTeamTemplateResponse(proposal: TeamTemplateProposal) {
   return {
     teamTemplateProposal: proposal,

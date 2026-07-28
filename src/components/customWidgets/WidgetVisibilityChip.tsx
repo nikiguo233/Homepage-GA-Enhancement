@@ -10,7 +10,7 @@ export function WidgetVisibilityChip({
 }) {
   const label = getCustomWidgetVisibilityChipLabel(access);
 
-  if (label !== "Shared") {
+  if (label !== "Published") {
     return null;
   }
 

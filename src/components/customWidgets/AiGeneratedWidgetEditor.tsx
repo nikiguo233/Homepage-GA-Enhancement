@@ -1,11 +1,10 @@
 import CloseIcon from "@mui/icons-material/Close";
 import { useMemo, useState } from "react";
-import type { CustomWidget } from "../../customWidgets/types";
-import { getCustomWidgetAccessDescription } from "../../customWidgets/widgetAccess";
+import type { CustomWidget, CustomWidgetAccess } from "../../customWidgets/types";
+import { normalizeCustomWidgetAccess } from "../../customWidgets/widgetAccess";
 import { getWidgetSizeLabel } from "../../customWidgets/widgetSizes";
 import { AiChatBadge } from "../../AiChatPanel";
-import { AiButton } from "../AiButton";
-import { PublishConfirmModal } from "./CustomWidgetDashboardCard";
+import { AiGeneratedChip } from "./AiGeneratedChip";
 import { WidgetEditorPreviewGrid } from "./WidgetEditorPreviewGrid";
 
 type EditorStep = "basic" | "configure";
@@ -13,7 +12,6 @@ type EditorStep = "basic" | "configure";
 export function AiGeneratedWidgetEditor({
   aiChatOpen = false,
   initialStep = "basic",
-  onAddToHomepage,
   onClose,
   onOpenAiChat,
   onSave,
@@ -21,14 +19,13 @@ export function AiGeneratedWidgetEditor({
 }: {
   aiChatOpen?: boolean;
   initialStep?: EditorStep;
-  onAddToHomepage?: () => void;
   onClose: () => void;
-  onOpenAiChat?: () => void;
-  onSave: () => void;
+  onOpenAiChat?: (draftMessage?: string) => void;
+  onSave: (access: CustomWidgetAccess) => void;
   widget: CustomWidget;
 }) {
   const [step, setStep] = useState<EditorStep>(initialStep);
-  const [showPublishConfirmModal, setShowPublishConfirmModal] = useState(false);
+  const isTenantAccess = normalizeCustomWidgetAccess(widget.access) === "tenant";
 
   const previewWidget = useMemo(
     () => ({
@@ -38,13 +35,16 @@ export function AiGeneratedWidgetEditor({
     [widget],
   );
 
-  const handleSave = () => {
-    setShowPublishConfirmModal(true);
+  const handleSaveForPersonalUse = () => {
+    onSave("private");
   };
 
-  const handleConfirmSaveAndPublish = () => {
-    onSave();
-    setShowPublishConfirmModal(false);
+  const handlePublish = () => {
+    onOpenAiChat?.("Publish this widget");
+  };
+
+  const handleUnpublish = () => {
+    onOpenAiChat?.("Unpublish this widget");
   };
 
   return (
@@ -62,7 +62,12 @@ export function AiGeneratedWidgetEditor({
           <span className="custom-widget-editor-brand">zuora</span>
           <div className="custom-widget-editor-title-group">
             <span className="custom-widget-editor-title">Custom Widget</span>
-            <span className="custom-widget-editor-status-chip is-published">Shared</span>
+            <span
+              className={`custom-widget-editor-status-chip${isTenantAccess ? " is-published" : ""}`}
+            >
+              {isTenantAccess ? "Published" : "Personal"}
+            </span>
+            <AiGeneratedChip className="custom-widget-ai-generated-chip-inline" />
           </div>
         </div>
         <nav aria-label="Widget steps" className="custom-widget-editor-tabs">
@@ -82,30 +87,28 @@ export function AiGeneratedWidgetEditor({
           </button>
         </nav>
         <div className="custom-widget-editor-header-actions">
-          <AiButton
-            background="light"
-            className="custom-widget-editor-edit-with-ai-button"
+          <button
+            className="custom-widget-editor-secondary-button"
             onClick={() => onOpenAiChat?.()}
-            size="medium"
-            variant="secondary"
+            type="button"
           >
             Edit with AI
-          </AiButton>
-          {onAddToHomepage ? (
+          </button>
+          {!isTenantAccess ? (
             <button
               className="custom-widget-editor-secondary-button"
-              onClick={onAddToHomepage}
+              onClick={handleSaveForPersonalUse}
               type="button"
             >
-              Add to Home Page
+              Save for Personal Use
             </button>
           ) : null}
           <button
             className="custom-widget-editor-primary-button"
-            onClick={handleSave}
+            onClick={isTenantAccess ? handleUnpublish : handlePublish}
             type="button"
           >
-            Save and Publish
+            {isTenantAccess ? "Unpublish Widget" : "Publish Widget"}
           </button>
         </div>
       </header>
@@ -127,10 +130,6 @@ export function AiGeneratedWidgetEditor({
                 <dd>{widget.description || "—"}</dd>
               </div>
             </dl>
-            <div className="custom-widget-field">
-              <span className="custom-widget-field-label">Access</span>
-              <p className="custom-widget-access-value">{getCustomWidgetAccessDescription()}</p>
-            </div>
             <div className="custom-widget-basic-actions">
               <button
                 className="custom-widget-primary-button"
@@ -161,15 +160,8 @@ export function AiGeneratedWidgetEditor({
           </div>
         </div>
       )}
-      {showPublishConfirmModal ? (
-        <PublishConfirmModal
-          access="tenant"
-          onCancel={() => setShowPublishConfirmModal(false)}
-          onConfirm={handleConfirmSaveAndPublish}
-        />
-      ) : null}
       {step === "configure" && !aiChatOpen && onOpenAiChat ? (
-        <AiChatBadge className="custom-widget-editor-ai-badge" onClick={onOpenAiChat} />
+        <AiChatBadge className="custom-widget-editor-ai-badge" onClick={() => onOpenAiChat()} />
       ) : null}
     </div>
   );

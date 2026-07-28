@@ -1,3 +1,5 @@
+import { isPublishWidgetPrompt, isUnpublishWidgetPrompt } from "./homepageConfigAssistant";
+
 export type ThinkingMode =
   | "cleanup"
   | "custom-widget"
@@ -144,6 +146,10 @@ function isCollectionsTemplatePrompt(text: string) {
 }
 
 export function getThinkingModeForPrompt(prompt: string): ThinkingMode {
+  if (isPublishWidgetPrompt(prompt) || isUnpublishWidgetPrompt(prompt)) {
+    return "general";
+  }
+
   if (isHomepageReorganizePrompt(prompt)) {
     return "cleanup";
   }

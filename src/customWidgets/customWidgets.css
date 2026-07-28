@@ -242,30 +242,6 @@
   flex-shrink: 0;
 }
 
-.custom-widget-management-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.custom-widget-created-by-me-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: rgba(0, 0, 0, 0.9);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.custom-widget-created-by-me-toggle .MuiSwitch-root {
-  margin: 0;
-}
-
 .create-widget-dropdown {
   position: relative;
 }
@@ -474,6 +450,23 @@
 
 .custom-widget-ai-generated-chip-inline {
   position: static;
+}
+
+.custom-widget-editor-header .custom-widget-ai-generated-chip-inline {
+  border-color: #00d2b9;
+  background: rgba(0, 210, 185, 0.16);
+}
+
+.custom-widget-editor-header .custom-widget-ai-generated-chip-inline .custom-widget-ai-generated-chip-label {
+  background: linear-gradient(90deg, #7de8dc 0%, #9ec0ff 52%, #c4a8ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.custom-widget-editor-header .custom-widget-ai-generated-chip-inline .custom-widget-ai-generated-chip-icon {
+  filter: brightness(0) saturate(100%) invert(93%) sepia(12%) saturate(746%) hue-rotate(119deg)
+    brightness(103%) contrast(101%);
 }
 
 .custom-widget-visibility-chip {
@@ -749,10 +742,6 @@
 .ai-generated-widget-editor .custom-widget-editor-header-actions {
   flex-shrink: 0;
   overflow: visible;
-}
-
-.ai-generated-widget-editor .custom-widget-editor-edit-with-ai-button {
-  flex-shrink: 0;
 }
 
 .custom-widget-editor-brand {

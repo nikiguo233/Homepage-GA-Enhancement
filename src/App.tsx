@@ -49,8 +49,9 @@ import { flushSync } from "react-dom";
 import configureHomepageIconUrl from "./assets/configure-homepage.svg";
 import { buildTopAccountsLiveDataProposal } from "./ai/assistantProposals";
 import { AI_RECOMMENDATION_TOP_ACCOUNTS_ID } from "./ai/recommendationRationales";
+import { getAiGeneratedWidgetAccessChatResponse } from "./ai/homepageConfigAssistant";
 import { useAiHomepageConfigChat } from "./ai/useAiHomepageConfigChat";
-import type { ChatPreview, CustomWidgetProposal, SuggestedAction, TeamTemplateProposal } from "./ai/types";
+import type { AssistantResponse, ChatPreview, CustomWidgetProposal, SuggestedAction, TeamTemplateProposal } from "./ai/types";
 import { HomepageTemplateEditor } from "./components/HomepageTemplateEditor";
 import { createTemplateDraftFromProposal, createTemplateId } from "./homepageConfig/teamTemplate";
 import type { HomepageTemplateDraft } from "./homepageConfig/teamTemplate";
@@ -88,7 +89,7 @@ import {
   normalizeCustomWidgetAccess,
 } from "./customWidgets/widgetAccess";
 import { createCustomWidgetRefId } from "./customWidgets/types";
-import type { CustomWidget, CustomWidgetDraft, CustomWidgetSize } from "./customWidgets/types";
+import type { CustomWidget, CustomWidgetAccess, CustomWidgetDraft, CustomWidgetSize } from "./customWidgets/types";
 import { saveAiGeneratedHomepageMetricWidgets } from "./customWidgets/aiGeneratedMetricWidgets";
 import { useCustomWidgets } from "./customWidgets/useCustomWidgets";
 
@@ -145,6 +146,7 @@ type HomepageView =
   | "create-widget"
   | "edit-widget"
   | "edit-template";
+type ManageCustomWidgetsViewTab = "shared" | "my";
 
 const WIDGET_TYPES = [
   {
@@ -1765,7 +1767,7 @@ export function App() {
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateEditorReturnView, setTemplateEditorReturnView] =
     useState<Extract<HomepageView, "home" | "manage-templates">>("home");
-  const [manageWidgetsCreatedByMeOnly, setManageWidgetsCreatedByMeOnly] = useState(false);
+  const [manageWidgetsViewTab, setManageWidgetsViewTab] = useState<ManageCustomWidgetsViewTab>("shared");
   const [manageTemplatesTab, setManageTemplatesTab] = useState<ManageTemplatesTab>("published");
   const [homepageMenuOpen, setHomepageMenuOpen] = useState(false);
   const configureActionsRef = useRef<HTMLDivElement | null>(null);
@@ -1855,37 +1857,54 @@ export function App() {
     setRevenueProgressAdded(cleanupRevenueProgressSnapshot.current);
   }, [undoCleanup]);
   const handleSaveProposedCustomWidget = useCallback(
-    (proposal: CustomWidgetProposal) => {
+    (proposal: CustomWidgetProposal, access?: CustomWidgetAccess) => {
       if (!proposal.supportsLiveData) {
         return undefined;
       }
 
       const liveProposal = buildTopAccountsLiveDataProposal();
+      const normalizedAccess = normalizeCustomWidgetAccess(access ?? "private");
+      const status = getCustomWidgetSavedStatus(normalizedAccess);
       const widgetId = saveWidget({
         ...liveProposal.draft,
-        status: "draft",
+        access: normalizedAccess,
+        status,
         isAiGenerated: true,
       });
+      const widgetName = liveProposal.draft.name?.trim() || "Custom widget";
+
+      if (homepageView === "manage-custom-widgets") {
+        setManageWidgetsViewTab(normalizedAccess === "private" ? "my" : "shared");
+        showFeedbackToast(
+          normalizedAccess === "tenant"
+            ? `${widgetName} has been published.`
+            : `${widgetName} has been saved.`,
+        );
+        return widgetId;
+      }
+
       const refId = createCustomWidgetRefId(widgetId, liveProposal.draft.size);
       addWidgets([refId]);
       setHighlightedWidgetRefId(refId);
-      const widgetName = liveProposal.draft.name?.trim() || "Custom widget";
 
       showFeedbackToast(`${widgetName} is added.`);
 
       return widgetId;
     },
-    [addWidgets, saveWidget, showFeedbackToast],
+    [addWidgets, homepageView, saveWidget, showFeedbackToast],
   );
-  const handleViewCustomWidgetsPersonalTab = useCallback(() => {
-    dismissFeedbackToast();
-    setShowOnboarding(false);
-    setEditingWidgetId(null);
-    setAiSuggestedWidgetDraft(null);
-    setAiSuggestedEditorStep(null);
-    setManageWidgetsCreatedByMeOnly(true);
-    setHomepageView("manage-custom-widgets");
-  }, [dismissFeedbackToast]);
+  const handleViewCustomWidgets = useCallback(
+    (tab: "shared" | "my" = "my") => {
+      dismissFeedbackToast();
+      setShowOnboarding(false);
+      setEditingWidgetId(null);
+      setAiSuggestedWidgetDraft(null);
+      setAiSuggestedEditorStep(null);
+      setManageWidgetsViewTab(tab);
+      setHomepageView("manage-custom-widgets");
+    },
+    [dismissFeedbackToast],
+  );
 
   const handleOpenSavedCustomWidget = useCallback(
     (widgetId: string) => {
@@ -1978,6 +1997,27 @@ export function App() {
     },
     [applyAiGeneratedLayout, saveWidget, widgets],
   );
+  const handleAiGeneratedWidgetAccessFromChat = useCallback(
+    (access: CustomWidgetAccess): AssistantResponse | null => {
+      if (!editingWidgetId) {
+        return null;
+      }
+
+      const widget = getWidgetById(editingWidgetId);
+
+      if (!widget || !isAiGeneratedCustomWidget(widget)) {
+        return null;
+      }
+
+      const normalizedAccess = normalizeCustomWidgetAccess(access);
+      const status = getCustomWidgetSavedStatus(normalizedAccess);
+
+      saveWidget({ ...widget, access: normalizedAccess, status }, editingWidgetId);
+
+      return getAiGeneratedWidgetAccessChatResponse(normalizedAccess, widget.name);
+    },
+    [editingWidgetId, getWidgetById, saveWidget],
+  );
   const isEmptyHomepage = startWithEmptyHomepage && !isAiGenerated;
   const {
     aiChatOpen,
@@ -2018,6 +2058,7 @@ export function App() {
     onApplyPreview: handleApplyAiGeneratedPreview,
     onSaveProposedTeamTemplate: handleSaveProposedTeamTemplate,
     onSaveProposedCustomWidget: handleSaveProposedCustomWidget,
+    onAiGeneratedWidgetAccessChange: handleAiGeneratedWidgetAccessFromChat,
     onUndoCleanup: handleUndoCleanup,
     onUndoPreview: resetToDefaultLayout,
     removedWidgetIds,
@@ -2126,7 +2167,7 @@ export function App() {
     setConfiguringCustomWidgetId(null);
     setWidgetDrawerConfigureEntry("select");
     setWidgetDrawerConfigureKind("revenue-progress");
-    setManageWidgetsCreatedByMeOnly(false);
+    setManageWidgetsViewTab("shared");
     setHomepageView("manage-custom-widgets");
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
@@ -2138,7 +2179,7 @@ export function App() {
   }, [scrollRef]);
 
   const handleOpenManageCustomWidgets = useCallback(() => {
-    setManageWidgetsCreatedByMeOnly(false);
+    setManageWidgetsViewTab("shared");
     setHomepageView("manage-custom-widgets");
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
@@ -2155,19 +2196,22 @@ export function App() {
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollRef]);
 
-  const handleOpenAiChatFromCustomWidgetEditor = useCallback(() => {
-    const widget = editingWidgetId ? getWidgetById(editingWidgetId) : undefined;
-    const widgetName =
-      widget?.name?.trim() ||
-      aiSuggestedWidgetDraft?.name?.trim() ||
-      "custom widget";
+  const handleOpenAiChatFromCustomWidgetEditor = useCallback(
+    (draftMessage?: string) => {
+      const widget = editingWidgetId ? getWidgetById(editingWidgetId) : undefined;
+      const widgetName =
+        widget?.name?.trim() ||
+        aiSuggestedWidgetDraft?.name?.trim() ||
+        "custom widget";
 
-    startChat({
-      context: "custom-widget",
-      draftMessage: `Help me update the "${widgetName}" widget`,
-      reset: true,
-    });
-  }, [aiSuggestedWidgetDraft?.name, editingWidgetId, getWidgetById, startChat]);
+      startChat({
+        context: "custom-widget",
+        draftMessage: draftMessage ?? `Help me update the "${widgetName}" widget`,
+        reset: true,
+      });
+    },
+    [aiSuggestedWidgetDraft?.name, editingWidgetId, getWidgetById, startChat],
+  );
 
   const handleOpenAiChatFromTemplateEditor = useCallback(() => {
     startChat({ context: "template", reset: true });
@@ -2267,13 +2311,14 @@ export function App() {
       setEditingWidgetId(null);
       setAiSuggestedWidgetDraft(null);
       setAiSuggestedEditorStep(null);
-      setManageWidgetsCreatedByMeOnly(false);
+      setManageWidgetsViewTab(access === "private" ? "my" : "shared");
       setHomepageView("manage-custom-widgets");
     },
     [editingWidgetId, saveWidget, showFeedbackToast],
   );
 
-  const handleSaveAiGeneratedWidget = useCallback(() => {
+  const handleSaveAiGeneratedWidget = useCallback(
+    (access: CustomWidgetAccess) => {
       if (!editingWidgetId) {
         return;
       }
@@ -2284,7 +2329,7 @@ export function App() {
         return;
       }
 
-      handleSaveCustomWidget({ ...widget, access: "tenant" });
+      handleSaveCustomWidget({ ...widget, access });
     },
     [editingWidgetId, getWidgetById, handleSaveCustomWidget],
   );
@@ -2351,28 +2396,6 @@ export function App() {
       setWidgetDrawerStep("configure");
     },
     [getWidgetById],
-  );
-
-  const handleAddPublishedWidgetToHomepage = useCallback(
-    (widgetId: string) => {
-      openCustomWidgetHomepageDrawer(widgetId);
-    },
-    [openCustomWidgetHomepageDrawer],
-  );
-
-  const handleAddCustomWidgetToHomepageFromEditor = useCallback(
-    (draft: CustomWidgetDraft) => {
-      const access = normalizeCustomWidgetAccess(draft.access);
-      const status = getCustomWidgetSavedStatus(access);
-      const widgetId = saveWidget({ ...draft, access, status }, editingWidgetId ?? undefined);
-
-      if (widgetId !== editingWidgetId) {
-        setEditingWidgetId(widgetId);
-      }
-
-      openCustomWidgetHomepageDrawer(widgetId);
-    },
-    [editingWidgetId, openCustomWidgetHomepageDrawer, saveWidget],
   );
 
   const handleSelectCustomWidget = useCallback(
@@ -2642,7 +2665,7 @@ export function App() {
   const customWidgetSummary =
     widgets.length === 0
       ? "You don't have any custom widgets yet."
-      : `${publishedWidgets.length} Shared, ${privateWidgets.length} Personal`;
+      : `${publishedWidgets.length} Published, ${privateWidgets.length} Personal`;
   const templateSummary =
     templates.length === 0
       ? "You don't have any templates yet."
@@ -2805,15 +2828,16 @@ export function App() {
           ) : null}
           {homepageView === "manage-custom-widgets" ? (
             <ManageCustomWidgetsPage
+              activeTab={manageWidgetsViewTab}
               historyEntries={historyEntries}
-              initialCreatedByMeOnly={manageWidgetsCreatedByMeOnly}
-              onAddToHomepage={handleAddPublishedWidgetToHomepage}
               onClearHistory={clearHistory}
               onCreateWidgetOption={handleCreateWidgetOption}
               onDeleteWidget={handleDeleteCustomWidgetFromList}
               onEditWidget={handleEditCustomWidget}
               onGoHome={handleGoHome}
               onGoHub={() => setHomepageView("manage-hub")}
+              onTabChange={setManageWidgetsViewTab}
+              privateWidgets={privateWidgets}
               publishedWidgets={publishedWidgets}
               widgets={widgets}
             />
@@ -2823,7 +2847,6 @@ export function App() {
           <AiGeneratedWidgetEditor
             aiChatOpen={aiChatOpen}
             initialStep={aiSuggestedEditorStep ?? "basic"}
-            onAddToHomepage={() => handleAddPublishedWidgetToHomepage(editingWidget.id)}
             onClose={handleCloseCustomWidgetEditor}
             onOpenAiChat={handleOpenAiChatFromCustomWidgetEditor}
             onSave={handleSaveAiGeneratedWidget}
@@ -2861,7 +2884,6 @@ export function App() {
             initialStep={aiSuggestedEditorStep ?? customWidgetEditorCapture?.step}
             isEditing={Boolean(editingWidgetId)}
             widgetId={editingWidgetId}
-            onAddToHomepage={handleAddCustomWidgetToHomepageFromEditor}
             onClose={handleCloseCustomWidgetEditor}
             onDelete={handleDeleteCustomWidget}
             onOpenAiChat={handleOpenAiChatFromCustomWidgetEditor}
@@ -2896,13 +2918,16 @@ export function App() {
           onClose={closeChat}
           onNewChat={handleNewChat}
           onRegeneratePreview={handleRegeneratePreview}
+          customWidgetProposalOrigin={
+            homepageView === "manage-custom-widgets" ? "custom-widgets-library" : "homepage"
+          }
           onSaveProposedCustomWidget={handleChatSaveProposedCustomWidget}
           onSaveProposedTeamTemplate={handleChatSaveProposedTeamTemplate}
           onSendMessage={handleSendMessage}
           onSuggestedAction={handleSuggestedAction}
           onUndoCleanup={handleChatUndoCleanup}
           onUndoPreview={handleUndoPreview}
-          onViewCustomWidgets={handleViewCustomWidgetsPersonalTab}
+          onViewCustomWidgets={handleViewCustomWidgets}
           onViewSavedTemplate={handleOpenSavedTemplate}
           open={aiChatOpen}
           suggestionContext={suggestionContext}

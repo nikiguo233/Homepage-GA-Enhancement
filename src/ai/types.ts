@@ -1,6 +1,6 @@
 import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
 import type { HomepageCleanupPlan } from "../homepageConfig/homepageCleanup";
-import type { CustomWidgetDraft, WidgetDataBinding } from "../customWidgets/types";
+import type { CustomWidgetAccess, CustomWidgetDraft, WidgetDataBinding } from "../customWidgets/types";
 
 export type AiGeneratedDashboardVariant = "default" | "month-end-close";
 
@@ -86,6 +86,7 @@ export type ChatMessage = {
   cleanupApplied?: boolean;
   customWidgetProposal?: CustomWidgetProposal;
   customWidgetSaved?: boolean;
+  customWidgetSavedAccess?: CustomWidgetAccess;
   proposedCustomWidgetId?: string;
   teamTemplateProposal?: TeamTemplateProposal;
   teamTemplateSaved?: boolean;

@@ -33,6 +33,7 @@ import { AiChatCleanupHomepagePreview, AiChatHomepagePreview } from "./component
 import { AiChatCustomWidgetPreview } from "./components/AiChatCustomWidgetPreview";
 import { AiChatWidgetRecommendationPreview } from "./components/AiChatWidgetRecommendationPreview";
 import { WidgetSourceBadge } from "./components/WidgetSourceBadge";
+import type { CustomWidgetAccess } from "./customWidgets/types";
 import { DASHBOARD_WIDGET_CATALOG } from "./components/dashboardWidgets/catalog";
 import aiSparkIconUrl from "./assets/ai-spark.svg";
 import aiSparkTabIconUrl from "./assets/ai-spark-tab.svg";
@@ -342,14 +343,18 @@ function AiChatCustomWidgetProposal({
   messageId,
   onSaveWidget,
   onViewCustomWidgets,
+  origin = "homepage",
   proposal,
   saved = false,
+  savedAccess,
 }: {
   messageId: string;
-  onSaveWidget?: (messageId: string, proposal: CustomWidgetProposal) => void;
-  onViewCustomWidgets?: () => void;
+  onSaveWidget?: (messageId: string, proposal: CustomWidgetProposal, access?: CustomWidgetAccess) => void;
+  onViewCustomWidgets?: (tab: "shared" | "my") => void;
+  origin?: "homepage" | "custom-widgets-library";
   proposal: CustomWidgetProposal;
   saved?: boolean;
+  savedAccess?: CustomWidgetAccess;
 }) {
   return (
     <div className="ai-chat-assistant-proposal">
@@ -368,16 +373,35 @@ function AiChatCustomWidgetProposal({
             <>
               <span className="ai-chat-assistant-proposal-status" role="status">
                 <span aria-hidden="true" className="ai-chat-assistant-proposal-status-dot" />
-                Added
+                {origin === "custom-widgets-library" ? "Saved" : "Added"}
               </span>
               <button
                 className="ai-chat-preview-undo"
-                onClick={() => onViewCustomWidgets?.()}
+                onClick={() =>
+                  onViewCustomWidgets?.(savedAccess === "tenant" ? "shared" : "my")
+                }
                 type="button"
               >
                 View in Custom Widgets
               </button>
             </>
+          ) : origin === "custom-widgets-library" ? (
+            <div className="ai-chat-assistant-proposal-actions ai-chat-assistant-proposal-actions-library">
+              <button
+                className="ai-chat-preview-regenerate"
+                onClick={() => onSaveWidget?.(messageId, proposal, "private")}
+                type="button"
+              >
+                Save Widget
+              </button>
+              <button
+                className="ai-chat-preview-apply"
+                onClick={() => onSaveWidget?.(messageId, proposal, "tenant")}
+                type="button"
+              >
+                Publish Widget
+              </button>
+            </div>
           ) : (
             <button
               className="ai-chat-preview-apply"
@@ -589,6 +613,7 @@ function AiChatMessageList({
   onUndoPreview,
   onViewCustomWidgets,
   onViewSavedTemplate,
+  customWidgetProposalOrigin = "homepage",
   thinkingProcess,
 }: {
   messages: ChatMessage[];
@@ -596,12 +621,17 @@ function AiChatMessageList({
   onApplyCleanup: (messageId: string, plan: HomepageCleanupPlan) => void;
   onApplyPreview: (messageId: string) => void;
   onRegeneratePreview: (messageId: string) => void;
-  onSaveProposedCustomWidget: (messageId: string, proposal: CustomWidgetProposal) => void;
+  onSaveProposedCustomWidget: (
+    messageId: string,
+    proposal: CustomWidgetProposal,
+    access?: CustomWidgetAccess,
+  ) => void;
   onSaveProposedTeamTemplate: (messageId: string, proposal: TeamTemplateProposal) => void;
   onUndoCleanup: (messageId: string) => void;
   onUndoPreview: (messageId: string) => void;
-  onViewCustomWidgets?: () => void;
+  onViewCustomWidgets?: (tab: "shared" | "my") => void;
   onViewSavedTemplate?: (templateId: string) => void;
+  customWidgetProposalOrigin?: "homepage" | "custom-widgets-library";
   thinkingProcess: ThinkingProcess | null;
 }) {
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -645,8 +675,10 @@ function AiChatMessageList({
               messageId={message.id}
               onSaveWidget={onSaveProposedCustomWidget}
               onViewCustomWidgets={onViewCustomWidgets}
+              origin={customWidgetProposalOrigin}
               proposal={message.customWidgetProposal}
               saved={message.customWidgetSaved}
+              savedAccess={message.customWidgetSavedAccess}
             />
           ) : null}
           {message.teamTemplateProposal ? (
@@ -729,6 +761,7 @@ export function AiChatPanel({
   onViewCustomWidgets,
   onViewSavedTemplate,
   open,
+  customWidgetProposalOrigin = "homepage",
   showEmptyStateSuggestions = true,
   suggestionContext = "homepage",
   suggestions = HOMEPAGE_CONFIG_SUGGESTIONS,
@@ -745,15 +778,20 @@ export function AiChatPanel({
   onInputMessageChange?: (value: string) => void;
   onNewChat?: () => void;
   onRegeneratePreview?: (messageId: string) => void;
-  onSaveProposedCustomWidget?: (messageId: string, proposal: CustomWidgetProposal) => void;
+  onSaveProposedCustomWidget?: (
+    messageId: string,
+    proposal: CustomWidgetProposal,
+    access?: CustomWidgetAccess,
+  ) => void;
   onSaveProposedTeamTemplate?: (messageId: string, proposal: TeamTemplateProposal) => void;
   onSendMessage?: (text: string) => void;
   onSuggestedAction?: (action: SuggestedAction) => void;
   onUndoCleanup?: (messageId: string) => void;
   onUndoPreview?: (messageId: string) => void;
-  onViewCustomWidgets?: () => void;
+  onViewCustomWidgets?: (tab: "shared" | "my") => void;
   onViewSavedTemplate?: (templateId: string) => void;
   open: boolean;
+  customWidgetProposalOrigin?: "homepage" | "custom-widgets-library";
   showEmptyStateSuggestions?: boolean;
   suggestionContext?: AiChatSuggestionContext;
   suggestions?: SuggestedAction[];
@@ -868,14 +906,15 @@ export function AiChatPanel({
                   onApplyCleanup={(messageId, plan) => onApplyCleanup?.(messageId, plan)}
                   onApplyPreview={(messageId) => onApplyPreview?.(messageId)}
                   onRegeneratePreview={(messageId) => onRegeneratePreview?.(messageId)}
-                  onSaveProposedCustomWidget={(messageId, proposal) =>
-                    onSaveProposedCustomWidget?.(messageId, proposal)
+                  onSaveProposedCustomWidget={(messageId, proposal, access) =>
+                    onSaveProposedCustomWidget?.(messageId, proposal, access)
                   }
                   onSaveProposedTeamTemplate={(messageId, proposal) =>
                     onSaveProposedTeamTemplate?.(messageId, proposal)
                   }
                   onUndoCleanup={(messageId) => onUndoCleanup?.(messageId)}
                   onUndoPreview={(messageId) => onUndoPreview?.(messageId)}
+                  customWidgetProposalOrigin={customWidgetProposalOrigin}
                   onViewCustomWidgets={onViewCustomWidgets}
                   onViewSavedTemplate={onViewSavedTemplate}
                   thinkingProcess={thinkingProcess}
