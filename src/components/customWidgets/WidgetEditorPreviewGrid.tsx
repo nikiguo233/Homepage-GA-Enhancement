@@ -27,7 +27,13 @@ export function WidgetEditorPreviewGrid({
 }: {
   previewWidget: Pick<
     CustomWidget,
-    "content" | "dataBinding" | "displayWidgetName" | "labelAsExternalContent" | "name" | "type"
+    | "content"
+    | "dataBinding"
+    | "displayWidgetName"
+    | "labelAsExternalContent"
+    | "name"
+    | "tableauConnection"
+    | "type"
   >;
   size: CustomWidgetSize;
 }) {

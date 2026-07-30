@@ -987,6 +987,12 @@
   line-height: 18px;
 }
 
+.custom-widget-embed-config-error {
+  color: #b3261e;
+  font-size: 13px;
+  line-height: 18px;
+}
+
 .custom-widget-embed-config-panel .custom-widget-field input[disabled][readonly] {
   background: #f5f5f5;
   color: #575e63;
@@ -1001,6 +1007,12 @@
   background: #fff;
   color: #575e63;
   font: inherit;
+}
+
+.custom-widget-embed-config-panel .custom-widget-field select:disabled {
+  background: #f5f5f5;
+  color: #575e63;
+  cursor: not-allowed;
 }
 
 .custom-widget-embed-config-fieldset {

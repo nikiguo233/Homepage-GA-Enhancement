@@ -1,17 +1,17 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { TableauConnectionSettings } from "../../customWidgets/types";
-import {
-  TABLEAU_PROVIDER_LABEL,
-} from "../../customWidgets/embedConfig";
+import { isTableauConnectionStepValid, TABLEAU_PROVIDER_LABEL } from "../../customWidgets/embedConfig";
 
 function EmbedConfigField({
   children,
   className = "",
+  hint,
   label,
   required = false,
 }: {
   children: ReactNode;
   className?: string;
+  hint?: string;
   label: string;
   required?: boolean;
 }) {
@@ -22,68 +22,58 @@ function EmbedConfigField({
         {required ? <span className="custom-widget-required"> *</span> : null}
       </span>
       {children}
+      {hint ? <span className="custom-widget-field-hint">{hint}</span> : null}
     </label>
   );
 }
 
 export function EmbedWidgetConfigPanel({
   connection,
+  connectionTestMessage = null,
+  connectionVerified = false,
   isReadOnly,
   onConnectionChange,
+  onTestConnection,
 }: {
   connection: TableauConnectionSettings;
+  connectionTestMessage?: string | null;
+  connectionVerified?: boolean;
   isReadOnly: boolean;
   onConnectionChange: (patch: Partial<TableauConnectionSettings>) => void;
+  onTestConnection: () => void;
 }) {
-  const [connectionTestMessage, setConnectionTestMessage] = useState<string | null>(null);
-
-  const handleTestConnection = () => {
-    setConnectionTestMessage("Connection successful.");
-  };
+  const canTestConnection = isTableauConnectionStepValid(connection);
 
   return (
     <div className="custom-widget-embed-config-panel">
       <section className="custom-widget-embed-config-section">
         <EmbedConfigField label="Provider" required>
-          <input disabled readOnly required type="text" value={TABLEAU_PROVIDER_LABEL} />
+          <select disabled required value={TABLEAU_PROVIDER_LABEL}>
+            <option value={TABLEAU_PROVIDER_LABEL}>{TABLEAU_PROVIDER_LABEL}</option>
+          </select>
         </EmbedConfigField>
 
         <EmbedConfigField label="Tableau View URL" required>
           <input
             disabled={isReadOnly}
             onChange={(event) => onConnectionChange({ siteUrl: event.target.value })}
-            placeholder="https://10ay.online.tableau.com/views/RevenueDashboard/RevenueOverview"
             required
             type="url"
             value={connection.siteUrl}
           />
         </EmbedConfigField>
 
-        <div className="custom-widget-embed-config-row">
-          <EmbedConfigField label="Connected App Client ID" required>
-            <input
-              disabled={isReadOnly}
-              onChange={(event) => onConnectionChange({ clientId: event.target.value })}
-              placeholder="a1b2c3d4-****"
-              required
-              type="text"
-              value={connection.clientId}
-            />
-          </EmbedConfigField>
+        <EmbedConfigField label="Secret ID" required>
+          <input
+            disabled={isReadOnly}
+            onChange={(event) => onConnectionChange({ secretId: event.target.value })}
+            required
+            type="text"
+            value={connection.secretId}
+          />
+        </EmbedConfigField>
 
-          <EmbedConfigField label="Secret ID" required>
-            <input
-              disabled={isReadOnly}
-              onChange={(event) => onConnectionChange({ secretId: event.target.value })}
-              placeholder="secret-id-****"
-              required
-              type="text"
-              value={connection.secretId}
-            />
-          </EmbedConfigField>
-        </div>
-
-        <EmbedConfigField label="Connected App secret" required>
+        <EmbedConfigField label="Secret Value" required>
           <input
             autoComplete="off"
             disabled={isReadOnly}
@@ -94,17 +84,48 @@ export function EmbedWidgetConfigPanel({
           />
         </EmbedConfigField>
 
+        <EmbedConfigField label="Client ID" required>
+          <input
+            disabled={isReadOnly}
+            onChange={(event) => onConnectionChange({ clientId: event.target.value })}
+            required
+            type="text"
+            value={connection.clientId}
+          />
+        </EmbedConfigField>
+
+        <EmbedConfigField
+          hint="Your Tableau Cloud login email — not a localhost username"
+          label="Tableau Username (JWT sub)"
+          required
+        >
+          <input
+            disabled={isReadOnly}
+            onChange={(event) => onConnectionChange({ tableauUsernameJwtSub: event.target.value })}
+            required
+            type="text"
+            value={connection.tableauUsernameJwtSub}
+          />
+        </EmbedConfigField>
+
         <div className="custom-widget-embed-config-section-actions">
           <button
-            className="custom-widget-secondary-button"
-            disabled={isReadOnly}
-            onClick={handleTestConnection}
+            className="custom-widget-primary-button"
+            disabled={isReadOnly || !canTestConnection}
+            onClick={onTestConnection}
             type="button"
           >
-            Test connection
+            Test Connection and Preview
           </button>
           {connectionTestMessage ? (
-            <span className="custom-widget-embed-config-success" role="status">
+            <span
+              className={
+                connectionVerified
+                  ? "custom-widget-embed-config-success"
+                  : "custom-widget-embed-config-error"
+              }
+              role="status"
+            >
               {connectionTestMessage}
             </span>
           ) : null}

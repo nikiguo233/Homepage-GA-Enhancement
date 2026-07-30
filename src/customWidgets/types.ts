@@ -19,6 +19,7 @@ export type TableauConnectionSettings = {
   clientId: string;
   secretId: string;
   connectedAppSecret: string;
+  tableauUsernameJwtSub: string;
   userMapping: string;
 };
 

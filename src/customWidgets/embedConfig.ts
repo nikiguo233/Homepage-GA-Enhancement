@@ -38,11 +38,12 @@ const DEFAULT_EMBED_URL_PLACEHOLDER = EMBED_URL_PLACEHOLDERS.tableau;
 export const DEFAULT_TABLEAU_CONNECTION: TableauConnectionSettings = {
   connectionName: "Production Tableau",
   provider: TABLEAU_PROVIDER_LABEL,
-  siteUrl: "https://10ay.online.tableau.com/views/RevenueDashboard/RevenueOverview",
+  siteUrl: "",
   clientId: "",
   secretId: "",
   connectedAppSecret: "",
-  userMapping: "Email match (Zuora email → Tableau username)",
+  tableauUsernameJwtSub: "",
+  userMapping: "",
 };
 
 export const DEFAULT_TABLEAU_DASHBOARD: TableauDashboardSettings = {
@@ -108,11 +109,12 @@ export function normalizeTableauConnection(
   return {
     connectionName: connection?.connectionName?.trim() || defaults.connectionName,
     provider: connection?.provider?.trim() || defaults.provider,
-    siteUrl: connection?.siteUrl?.trim() || defaults.siteUrl,
+    siteUrl: connection?.siteUrl ?? defaults.siteUrl,
     clientId: connection?.clientId ?? defaults.clientId,
     secretId: connection?.secretId ?? defaults.secretId,
     connectedAppSecret: connection?.connectedAppSecret ?? defaults.connectedAppSecret,
-    userMapping: connection?.userMapping?.trim() || defaults.userMapping,
+    tableauUsernameJwtSub: connection?.tableauUsernameJwtSub ?? defaults.tableauUsernameJwtSub,
+    userMapping: connection?.userMapping ?? defaults.userMapping,
   };
 }
 
@@ -142,7 +144,8 @@ export function isTableauConnectionStepValid(connection: TableauConnectionSettin
     connection.siteUrl.trim().length > 0 &&
     connection.clientId.trim().length > 0 &&
     connection.secretId.trim().length > 0 &&
-    connection.connectedAppSecret.trim().length > 0
+    connection.connectedAppSecret.trim().length > 0 &&
+    connection.tableauUsernameJwtSub.trim().length > 0
   );
 }
 
@@ -151,7 +154,9 @@ export function isEmbedConfigValid(draft: CustomWidgetDraft) {
     return true;
   }
 
-  if (!validateEmbedUrl(draft.content).valid) {
+  const embedUrl = draft.content.trim() || draft.tableauConnection.siteUrl.trim();
+
+  if (!validateEmbedUrl(embedUrl).valid) {
     return false;
   }
 

@@ -10,6 +10,10 @@ import {
 } from "../../customWidgets/embedPolicy";
 import { buildWidgetPreviewDocument } from "../../customWidgets/previewDocument";
 import { buildShowcasePreviewDocument } from "../../customWidgets/showcasePreviewDocument";
+import {
+  buildTableauPreviewDocument,
+  isTableauEmbedUrl,
+} from "../../customWidgets/tableauPreviewDocument";
 import type { CustomWidget, CustomWidgetSize } from "../../customWidgets/types";
 import { getWidgetDesignDimensions, getWidgetGridSlotDimensions } from "../../customWidgets/widgetSizes";
 
@@ -36,7 +40,13 @@ export function CustomWidgetPreviewFrame({
   size?: CustomWidgetSize;
   widget: Pick<
     CustomWidget,
-    "content" | "dataBinding" | "displayWidgetName" | "labelAsExternalContent" | "name" | "type"
+    | "content"
+    | "dataBinding"
+    | "displayWidgetName"
+    | "labelAsExternalContent"
+    | "name"
+    | "tableauConnection"
+    | "type"
   >;
 }) {
   const shellRef = useRef<HTMLDivElement>(null);
@@ -54,6 +64,15 @@ export function CustomWidgetPreviewFrame({
     widget.type === "embed" ? validateEmbedUrl(widget.content) : null;
   const embedTargetUrl =
     embedValidation?.valid && embedValidation.normalizedUrl ? getEmbedTargetUrl(widget.content) : null;
+  const isTableauPreview = Boolean(
+    widget.type === "embed" && embedTargetUrl && isTableauEmbedUrl(embedTargetUrl),
+  );
+  const tableauPreviewDocument = isTableauPreview
+    ? buildTableauPreviewDocument({
+        username: widget.tableauConnection?.tableauUsernameJwtSub,
+        viewUrl: embedTargetUrl ?? widget.content,
+      })
+    : null;
   const isImageEmbed = Boolean(embedTargetUrl && isEmbedImageUrl(embedTargetUrl));
   const embedViewport = { width: designWidth, height: designHeight };
   const embedSrc =
@@ -108,7 +127,21 @@ export function CustomWidgetPreviewFrame({
   }, [designHeight, designWidth, gridFit]);
 
   useEffect(() => {
-    if (widget.type !== "embed" || !embedSrc) {
+    if (widget.type !== "embed") {
+      setEmbedLoadState("idle");
+      setShowLoadHint(false);
+      setUseShowcaseFallback(false);
+      return;
+    }
+
+    if (isTableauPreview) {
+      setShowLoadHint(false);
+      setUseShowcaseFallback(false);
+      setEmbedLoadState("ready");
+      return;
+    }
+
+    if (!embedSrc) {
       setEmbedLoadState("idle");
       setShowLoadHint(false);
       setUseShowcaseFallback(false);
@@ -124,7 +157,7 @@ export function CustomWidgetPreviewFrame({
 
     setUseShowcaseFallback(false);
     setEmbedLoadState("loading");
-  }, [embedSrc, isImageEmbed, widget.content, widget.type]);
+  }, [embedSrc, isImageEmbed, isTableauPreview, widget.content, widget.type]);
 
   useEffect(() => {
     if (embedLoadState !== "loading" || !isInteractive) {
@@ -249,7 +282,18 @@ export function CustomWidgetPreviewFrame({
 
   const iframe =
     widget.type === "embed" ? (
-      isImageEmbed && embedTargetUrl ? (
+      isTableauPreview && tableauPreviewDocument ? (
+        <iframe
+          className="custom-widget-preview-frame"
+          key={`tableau-${embedTargetUrl}`}
+          onLoad={handleEmbedLoad}
+          sandbox="allow-scripts allow-same-origin"
+          scrolling={compact ? "no" : "auto"}
+          srcDoc={tableauPreviewDocument}
+          style={iframeStyle}
+          title="Tableau dashboard preview"
+        />
+      ) : isImageEmbed && embedTargetUrl ? (
         <img
           alt=""
           className="custom-widget-preview-frame custom-widget-preview-image"
@@ -301,7 +345,7 @@ export function CustomWidgetPreviewFrame({
   const showExternalContentChip = widget.labelAsExternalContent;
   const showWidgetNameTitle =
     widget.displayWidgetName && widget.name.trim().length > 0 && !compact;
-  const showEmbedFallback = widget.type === "embed" && !embedSrc;
+  const showEmbedFallback = widget.type === "embed" && !embedSrc && !isTableauPreview;
   const showEmbedUnavailable = widget.type === "embed" && embedLoadState === "unavailable";
   const showEmbedLoading = widget.type === "embed" && embedLoadState === "loading" && isInteractive;
 

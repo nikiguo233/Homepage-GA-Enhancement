@@ -8,7 +8,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CUSTOM_WIDGET_HTML, DEFAULT_EMBED_URL } from "../../customWidgets/defaultTemplate";
 import { validateEmbedUrl } from "../../customWidgets/embedPolicy";
 import { ENABLE_LABEL_AS_EXTERNAL_CONTENT } from "../../customWidgets/featureFlags";
-import { createDefaultEmbedConfig, isEmbedConfigValid, normalizeEmbedConfig } from "../../customWidgets/embedConfig";
+import {
+  createDefaultEmbedConfig,
+  isEmbedConfigValid,
+  isTableauConnectionStepValid,
+  normalizeEmbedConfig,
+} from "../../customWidgets/embedConfig";
 import {
   getWidgetDataBindingQuerySummary,
   getWidgetDataBindingSourceLabel,
@@ -29,7 +34,7 @@ import {
   parseWidgetSize,
   sortWidgetSizes,
 } from "../../customWidgets/widgetSizes";
-import type { CustomWidgetDraft, CustomWidgetSize, CustomWidgetType } from "../../customWidgets/types";
+import type { CustomWidgetDraft, CustomWidgetSize, CustomWidgetType, TableauConnectionSettings } from "../../customWidgets/types";
 import { normalizeCustomWidgetAccess } from "../../customWidgets/widgetAccess";
 import { CustomWidgetPreviewFrame } from "./CustomWidgetPreviewFrame";
 import { WidgetEditorPreviewGrid } from "./WidgetEditorPreviewGrid";
@@ -52,6 +57,42 @@ const WORKSPACE_RESIZER_WIDTH = 16;
 
 function isBasicInfoValid(draft: CustomWidgetDraft) {
   return draft.name.trim().length > 0 && draft.description.trim().length > 0;
+}
+
+function isEmbedConnectionVerified(draft: CustomWidgetDraft) {
+  if (draft.type !== "embed") {
+    return false;
+  }
+
+  const connection = normalizeEmbedConfig(draft).tableauConnection;
+  const siteUrl = connection.siteUrl.trim();
+  const contentValidation = validateEmbedUrl(draft.content.trim());
+  const siteValidation = validateEmbedUrl(siteUrl);
+
+  return (
+    isTableauConnectionStepValid(connection) &&
+    contentValidation.valid &&
+    siteValidation.valid &&
+    contentValidation.normalizedUrl === siteValidation.normalizedUrl
+  );
+}
+
+function buildEmbedSaveDraft(draft: CustomWidgetDraft): CustomWidgetDraft {
+  if (draft.type !== "embed") {
+    return draft;
+  }
+
+  const siteUrl = normalizeEmbedConfig(draft).tableauConnection.siteUrl.trim();
+  const validation = validateEmbedUrl(siteUrl);
+
+  if (!validation.valid || !validation.normalizedUrl) {
+    return draft;
+  }
+
+  return {
+    ...draft,
+    content: validation.normalizedUrl,
+  };
 }
 
 export function CustomWidgetEditor({
@@ -87,18 +128,29 @@ export function CustomWidgetEditor({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [embedConnectionVerified, setEmbedConnectionVerified] = useState(() =>
+    isEmbedConnectionVerified({
+      ...initialDraft,
+      ...normalizeEmbedConfig(initialDraft),
+    }),
+  );
+  const [connectionTestMessage, setConnectionTestMessage] = useState<string | null>(null);
   const [codePanelWidth, setCodePanelWidth] = useState(DEFAULT_CODE_PANEL_WIDTH);
   const [isResizingWorkspace, setIsResizingWorkspace] = useState(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const resizeStateRef = useRef<{ startWidth: number; startX: number } | null>(null);
 
   useEffect(() => {
-    setDraft({
+    const nextDraft = {
       ...initialDraft,
       access: normalizeCustomWidgetAccess(initialDraft.access),
       ...normalizeEmbedConfig(initialDraft),
-    });
+    };
+
+    setDraft(nextDraft);
     setStep(initialStep);
+    setEmbedConnectionVerified(isEmbedConnectionVerified(nextDraft));
+    setConnectionTestMessage(null);
   }, [widgetId]);
 
   const embedValidation = useMemo(
@@ -119,7 +171,10 @@ export function CustomWidgetEditor({
   );
   const embedConfig = useMemo(() => normalizeEmbedConfig(draft), [draft]);
   const showEmbedPreview =
-    draft.type === "embed" && Boolean(embedValidation?.valid) && draft.supportedSizes.length > 0;
+    draft.type === "embed" &&
+    embedConnectionVerified &&
+    Boolean(embedValidation?.valid) &&
+    draft.supportedSizes.length > 0;
   const isTenantAccess = normalizeCustomWidgetAccess(draft.access) === "tenant";
   const customSupportedSize = getCustomSupportedSize(draft.supportedSizes);
   const isCustomSizeEnabled = Boolean(customSupportedSize);
@@ -134,6 +189,7 @@ export function CustomWidgetEditor({
       labelAsExternalContent: draft.labelAsExternalContent,
       name: draft.name,
       size: draft.size,
+      tableauConnection: embedConfig.tableauConnection,
       type: draft.type,
     }),
     [
@@ -144,6 +200,7 @@ export function CustomWidgetEditor({
       draft.name,
       draft.size,
       draft.type,
+      embedConfig.tableauConnection,
     ],
   );
   const dataBindingSummary = draft.dataBinding
@@ -155,6 +212,8 @@ export function CustomWidgetEditor({
   };
 
   const handleTypeChange = (type: CustomWidgetType) => {
+    setEmbedConnectionVerified(false);
+    setConnectionTestMessage(null);
     setDraft((current) => {
       const next: CustomWidgetDraft = {
         ...current,
@@ -175,7 +234,7 @@ export function CustomWidgetEditor({
   };
 
   const handleSaveForPersonalUse = () => {
-    onSave({ ...draft, access: "private" });
+    onSave(buildEmbedSaveDraft({ ...draft, access: "private" }));
   };
 
   const handlePublish = () => {
@@ -187,13 +246,48 @@ export function CustomWidgetEditor({
   };
 
   const handleConfirmPublish = () => {
-    onSave({ ...draft, access: "tenant" });
+    onSave(buildEmbedSaveDraft({ ...draft, access: "tenant" }));
     setShowPublishConfirmModal(false);
   };
 
   const handleConfirmUnpublish = () => {
-    onSave({ ...draft, access: "private" });
+    onSave(buildEmbedSaveDraft({ ...draft, access: "private" }));
     setShowUnpublishConfirmModal(false);
+  };
+
+  const handleConnectionChange = (patch: Partial<TableauConnectionSettings>) => {
+    setEmbedConnectionVerified(false);
+    setConnectionTestMessage(null);
+    updateDraft({
+      content: "",
+      tableauConnection: {
+        ...embedConfig.tableauConnection,
+        ...patch,
+      },
+    });
+  };
+
+  const handleTestConnection = () => {
+    const connection = embedConfig.tableauConnection;
+
+    if (!isTableauConnectionStepValid(connection)) {
+      setEmbedConnectionVerified(false);
+      setConnectionTestMessage("Complete all required connection fields.");
+      return;
+    }
+
+    const siteUrl = connection.siteUrl.trim();
+    const validation = validateEmbedUrl(siteUrl);
+
+    if (!validation.valid || !validation.normalizedUrl) {
+      setEmbedConnectionVerified(false);
+      setConnectionTestMessage(validation.error ?? "Enter a valid HTTPS Tableau view URL.");
+      return;
+    }
+
+    updateDraft({ content: validation.normalizedUrl });
+    setEmbedConnectionVerified(true);
+    setConnectionTestMessage("Connection successful.");
   };
 
   const handleDelete = () => {
@@ -621,15 +715,11 @@ export function CustomWidgetEditor({
                   ) : (
                     <EmbedWidgetConfigPanel
                       connection={embedConfig.tableauConnection}
+                      connectionTestMessage={connectionTestMessage}
+                      connectionVerified={embedConnectionVerified}
                       isReadOnly={false}
-                      onConnectionChange={(patch) =>
-                        updateDraft({
-                          tableauConnection: {
-                            ...embedConfig.tableauConnection,
-                            ...patch,
-                          },
-                        })
-                      }
+                      onConnectionChange={handleConnectionChange}
+                      onTestConnection={handleTestConnection}
                     />
                   )}
                 </div>
@@ -669,7 +759,11 @@ export function CustomWidgetEditor({
                     Select supported widget size to preview
                   </p>
                 ) : draft.type === "embed" && !showEmbedPreview ? (
-                  <p className="custom-widget-preview-empty-message">No Preview</p>
+                  <p className="custom-widget-preview-empty-message">
+                    {isTableauConnectionStepValid(embedConfig.tableauConnection)
+                      ? "Test connection to preview dashboard"
+                      : "Complete Tableau configuration to preview"}
+                  </p>
                 ) : (
                   <WidgetEditorPreviewGrid previewWidget={previewWidget} size={previewWidget.size} />
                 )}
