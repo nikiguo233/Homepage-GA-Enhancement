@@ -56,6 +56,7 @@ import { HomepageTemplateEditor } from "./components/HomepageTemplateEditor";
 import { createTemplateDraftFromProposal, createTemplateId } from "./homepageConfig/teamTemplate";
 import type { HomepageTemplateDraft } from "./homepageConfig/teamTemplate";
 import { AiChatBadge, AiChatPanel } from "./AiChatPanel";
+import { AiSearchField } from "./components/AiSearchField";
 import { AiGeneratedDashboard } from "./components/AiGeneratedDashboard";
 import { DashboardWidget } from "./components/dashboardWidgets/DashboardWidgets";
 import type { DashboardWidgetId } from "./components/dashboardWidgets/catalog";
@@ -961,8 +962,20 @@ function StickyHeader({ active, visible }: { active: boolean; visible: boolean }
   );
 }
 
-function MorphingSearchField() {
-  return <SearchField className="morphing-search-control" />;
+function MorphingSearchField({
+  onOpenAi,
+  onSubmitToAi,
+}: {
+  onOpenAi: () => void;
+  onSubmitToAi: (prompt: string) => void;
+}) {
+  return (
+    <AiSearchField
+      className="morphing-search-control"
+      onOpenAi={onOpenAi}
+      onSubmitToAi={onSubmitToAi}
+    />
+  );
 }
 
 function MorphingFloatingActions({
@@ -2040,6 +2053,7 @@ export function App() {
     openChat,
     showEmptyStateSuggestions,
     startChat,
+    startChatWithPrompt,
     suggestionContext,
     suggestions,
     thinkingProcess,
@@ -2713,7 +2727,12 @@ export function App() {
           tabIndex={0}
         >
         <StickyHeader active={stickyControlsActive && isHomeView} visible={isHomeView} />
-        {isHomeView ? <MorphingSearchField /> : null}
+        {isHomeView ? (
+          <MorphingSearchField
+            onOpenAi={openChat}
+            onSubmitToAi={(prompt) => startChatWithPrompt(prompt, { context: "homepage" })}
+          />
+        ) : null}
         {isHomeView ? (
           <MorphingFloatingActions
             configureActionsRef={configureActionsRef}
