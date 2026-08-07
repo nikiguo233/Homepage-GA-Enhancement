@@ -130,37 +130,57 @@
 }
 
 .ai-search-ask-ai-button {
-  display: inline-flex;
   flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 4px 12px 4px 10px;
-  border: 2px solid var(--occam-color-teal-300);
-  border-radius: 999px;
-  background: linear-gradient(
-    155deg,
-    #00b49f 7.76%,
-    var(--occam-color-blue-400) 46.96%,
-    var(--occam-color-purple-400) 85.09%
-  );
-  color: var(--occam-color-white);
-  font-size: var(--font-button-size);
-  font-weight: var(--font-button-weight);
-  line-height: var(--font-button-line-height);
-  white-space: nowrap;
-  cursor: pointer;
 }
 
-.ai-search-ask-ai-button .ai-search-ask-ai-button-icon,
-.ai-search-field-root .ai-search-ask-ai-button .MuiSvgIcon-root {
+.ai-search-ask-ai-button .ai-search-ask-ai-button-icon-wrap {
+  position: relative;
+  flex: 0 0 auto;
   width: 16px;
   height: 16px;
-  color: #ffffff;
 }
 
-.ai-search-ask-ai-button:hover {
-  filter: brightness(1.05);
+.ai-search-ask-ai-button-spark,
+.ai-search-ask-ai-button-return,
+.ai-search-field-root.search-field .ai-search-ask-ai-button .MuiSvgIcon-root.ai-search-ask-ai-button-return {
+  position: absolute;
+  inset: 0;
+  width: 16px;
+  height: 16px;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+.ai-search-field-root.search-field .ai-search-ask-ai-button .MuiSvgIcon-root.ai-search-ask-ai-button-return {
+  color: #0d4ac3;
+  fill: currentColor;
+}
+
+.ai-search-ask-ai-button-spark {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ai-search-ask-ai-button-return {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.ai-search-ask-ai-button.has-query .ai-search-ask-ai-button-spark {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.ai-search-ask-ai-button.has-query .ai-search-ask-ai-button-return {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.search-field-compact.ai-search-field-root .ai-search-ask-ai-button.occam-ai-button--small {
+  min-height: 28px;
+  padding: 4px 10px 4px 8px;
+  font-size: 12px;
 }
 
 .ai-search-panel-shell {
@@ -685,11 +705,6 @@
   box-shadow: none;
 }
 
-.search-field-compact.ai-search-field-root .ai-search-ask-ai-button {
-  min-height: 28px;
-  padding-inline: 10px;
-  font-size: 12px;
-}
 
 .search-field-compact.ai-search-field-root.is-open {
   border-radius: 24px;

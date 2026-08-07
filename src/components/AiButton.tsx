@@ -28,6 +28,8 @@ function getIconFill(
 type AiButtonProps = {
   background?: AiButtonBackground;
   children: ReactNode;
+  icon?: ReactNode;
+  shape?: "default" | "pill";
   showIcon?: boolean;
   size?: AiButtonSize;
   variant?: AiButtonVariant;
@@ -37,9 +39,11 @@ export function AiButton({
   background = "light",
   children,
   className = "",
+  icon,
+  shape = "default",
   showIcon = true,
   size = "medium",
-  variant = "primary",
+  variant = "secondary",
   type = "button",
   ...props
 }: AiButtonProps) {
@@ -52,6 +56,7 @@ export function AiButton({
         `occam-ai-button--${variant}`,
         `occam-ai-button--${size}`,
         `occam-ai-button--${background}`,
+        shape === "pill" ? "occam-ai-button--pill" : "",
         className,
       ]
         .filter(Boolean)
@@ -61,25 +66,29 @@ export function AiButton({
       {...props}
     >
       {showIcon ? (
-        <svg aria-hidden="true" className="occam-ai-button__icon" viewBox="0 0 16 16" fill="none">
-          {variant === "secondary" && background === "light" ? (
-            <defs>
-              <linearGradient
-                gradientUnits="userSpaceOnUse"
-                id={gradientId}
-                x1="0"
-                x2="16"
-                y1="8"
-                y2="8"
-              >
-                <stop offset="7.76%" stopColor="#00b49f" />
-                <stop offset="46.96%" stopColor="#3269d4" />
-                <stop offset="85.09%" stopColor="#6f4dcd" />
-              </linearGradient>
-            </defs>
-          ) : null}
-          <path d={AI_SPARK_ICON_PATH} fill={getIconFill(variant, background, gradientId)} />
-        </svg>
+        icon ? (
+          <span className="occam-ai-button__icon occam-ai-button__icon--custom">{icon}</span>
+        ) : (
+          <svg aria-hidden="true" className="occam-ai-button__icon" viewBox="0 0 16 16" fill="none">
+            {variant === "secondary" && background === "light" ? (
+              <defs>
+                <linearGradient
+                  gradientUnits="userSpaceOnUse"
+                  id={gradientId}
+                  x1="0"
+                  x2="16"
+                  y1="8"
+                  y2="8"
+                >
+                  <stop offset="5.99%" stopColor="#009684" />
+                  <stop offset="49.29%" stopColor="#0d4ac3" />
+                  <stop offset="100%" stopColor="#5435ab" />
+                </linearGradient>
+              </defs>
+            ) : null}
+            <path d={AI_SPARK_ICON_PATH} fill={getIconFill(variant, background, gradientId)} />
+          </svg>
+        )
       ) : null}
       <span className="occam-ai-button__label">{children}</span>
     </button>

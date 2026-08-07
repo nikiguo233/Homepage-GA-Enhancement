@@ -13,6 +13,7 @@ import {
 } from "react";
 import type { SuggestedAction } from "../ai/types";
 import aiSparkTabIconUrl from "../assets/ai-spark-tab.svg";
+import { AiButton } from "./AiButton";
 import {
   AI_SEARCH_SUGGESTIONS,
   loadSearchHistory,
@@ -55,6 +56,7 @@ export function AiSearchField({
   const globalSearchDelayRef = useRef<number | null>(null);
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [isGlobalSearchLoading, setIsGlobalSearchLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState(loadSearchHistory);
   const [activeCategory, setActiveCategory] = useState<GlobalSearchCategory>("Customers");
@@ -93,6 +95,7 @@ export function AiSearchField({
   );
 
   const categoryResultCount = getCategoryResultCount(displayedCategory, categoryCounts);
+  const showReturnIcon = isInputFocused && query.length > 0;
 
   useEffect(() => {
     if (!isOpen) {
@@ -154,6 +157,8 @@ export function AiSearchField({
     const nextHistory = prependSearchHistory(searchHistory, normalized);
     setSearchHistory(nextHistory);
     saveSearchHistory(nextHistory);
+    setQuery("");
+    setIsInputFocused(false);
     setIsOpen(false);
     onSubmitToAi(normalized);
   };
@@ -214,7 +219,11 @@ export function AiSearchField({
             aria-label={placeholder}
             autoComplete="off"
             onChange={(event) => setQuery(event.target.value)}
-            onFocus={() => setIsOpen(true)}
+            onBlur={() => setIsInputFocused(false)}
+            onFocus={() => {
+              setIsOpen(true);
+              setIsInputFocused(true);
+            }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             ref={inputRef}
@@ -223,18 +232,30 @@ export function AiSearchField({
             type="text"
             value={query}
           />
-          <button
-            className="ai-search-ask-ai-button"
+          <AiButton
+            background="light"
+            className={`ai-search-ask-ai-button${showReturnIcon ? " has-query" : ""}`}
+            icon={
+              <span aria-hidden="true" className="ai-search-ask-ai-button-icon-wrap">
+                <img
+                  alt=""
+                  className="ai-search-ask-ai-button-spark"
+                  src={aiSparkTabIconUrl}
+                />
+                <KeyboardReturnOutlinedIcon
+                  className="ai-search-ask-ai-button-return"
+                  sx={{ color: "#0d4ac3", fontSize: 16 }}
+                />
+              </span>
+            }
             onClick={() => submitToAi(query)}
-            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            shape="pill"
+            size="small"
+            variant="secondary"
           >
-            <KeyboardReturnOutlinedIcon
-              aria-hidden="true"
-              className="ai-search-ask-ai-button-icon"
-              sx={{ color: "#ffffff", fontSize: 16 }}
-            />
-            <span>Ask Zuora AI</span>
-          </button>
+            Ask Zuora AI
+          </AiButton>
         </div>
       </div>
 

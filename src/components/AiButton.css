@@ -40,9 +40,10 @@
 
 .occam-ai-button--small {
   min-height: 32px;
-  padding: 4px 12px 4px 10px;
-  font-size: 12px;
-  line-height: 18px;
+  padding: 6px 12px 6px 8px;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .occam-ai-button--small .occam-ai-button__icon {
@@ -60,6 +61,10 @@
 .occam-ai-button--x-small .occam-ai-button__icon {
   width: 12px;
   height: 12px;
+}
+
+.occam-ai-button--pill {
+  border-radius: 999px;
 }
 
 .occam-ai-button--primary.occam-ai-button--dark,
@@ -81,7 +86,7 @@
 }
 
 .occam-ai-button--secondary.occam-ai-button--light {
-  border: 1px solid var(--occam-color-teal-300);
+  border: 1px solid #00d2b9;
   background:
     linear-gradient(
       162.75deg,
@@ -91,18 +96,20 @@
     ),
     var(--occam-color-white);
   color: var(--occam-text-primary);
+  backdrop-filter: blur(2px);
 }
 
 .occam-ai-button--secondary.occam-ai-button--light .occam-ai-button__label {
-  background: linear-gradient(
-    155deg,
-    #00b49f 7.76%,
-    var(--occam-color-blue-400) 46.96%,
-    var(--occam-color-purple-400) 85.09%
-  );
+  background: linear-gradient(130.82deg, #009684 5.99%, #0d4ac3 49.29%, #5435ab 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.occam-ai-button__icon--custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .occam-ai-button--text.occam-ai-button--dark,
