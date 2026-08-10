@@ -186,12 +186,20 @@ function AiChatWidgetRecommendations({
     setSelectedIds((current) => current.filter((id) => !appliedWidgetIds.includes(id)));
   }, [appliedWidgetIds]);
 
+  const selectableIds = selectableWidgets.map((widget) => widget.id);
+  const allSelectableSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id));
+
   const toggleWidget = (widgetId: string) => {
     setSelectedIds((current) =>
       current.includes(widgetId)
         ? current.filter((id) => id !== widgetId)
         : [...current, widgetId],
     );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedIds(allSelectableSelected ? [] : selectableIds);
   };
 
   const handleAdd = () => {
@@ -209,17 +217,30 @@ function AiChatWidgetRecommendations({
 
     return (
       <li className="ai-chat-widget-item" key={widget.id}>
-        <div className={`ai-chat-widget-option${isApplied ? " is-applied" : ""}`}>
-          <label className="ai-chat-widget-option-label">
-            <input
-              checked={isApplied || isSelected}
-              disabled={isApplied}
-              onChange={() => toggleWidget(widget.id)}
-              type="checkbox"
-            />
-            <span className="ai-chat-widget-option-name">{widget.name}</span>
-            {isApplied ? <span className="ai-chat-widget-added-badge">Added</span> : null}
-          </label>
+        <div
+          className={`ai-chat-widget-option${isApplied ? " is-applied" : ""}${isSelected ? " is-selected" : ""}`}
+        >
+          {isApplied ? (
+            <div className="ai-chat-widget-option-header">
+              <span className="ai-chat-widget-option-name">{widget.name}</span>
+              <span className="ai-chat-widget-added-badge">Added</span>
+            </div>
+          ) : (
+            <label
+              className="ai-chat-widget-option-header ai-chat-widget-option-select"
+              htmlFor={`widget-select-${widget.id}`}
+            >
+              <span className="ai-chat-widget-option-name">{widget.name}</span>
+              <input
+                aria-label={`Select ${widget.name}`}
+                checked={isSelected}
+                className="ai-chat-widget-option-checkbox-input"
+                id={`widget-select-${widget.id}`}
+                onChange={() => toggleWidget(widget.id)}
+                type="checkbox"
+              />
+            </label>
+          )}
           <AiChatWidgetRecommendationPreview widget={widget} />
         </div>
       </li>
@@ -228,6 +249,15 @@ function AiChatWidgetRecommendations({
 
   return (
     <div className="ai-chat-widget-recommendations">
+      {selectableIds.length > 0 ? (
+        <button
+          className="text-button ai-chat-widget-select-all"
+          onClick={handleSelectAll}
+          type="button"
+        >
+          Select All Widgets
+        </button>
+      ) : null}
       {sourceGroups ? (
         <div className="ai-chat-widget-source-groups">
           {sourceGroups.map((group) => (
@@ -248,7 +278,7 @@ function AiChatWidgetRecommendations({
         onClick={handleAdd}
         type="button"
       >
-        Add to Home Page
+        Add Selected
       </button>
     </div>
   );
@@ -357,18 +387,15 @@ function AiChatCustomWidgetProposal({
   savedAccess?: CustomWidgetAccess;
 }) {
   return (
-    <div className="ai-chat-assistant-proposal">
-      <div className="ai-chat-assistant-proposal-summary">
-        <h4>{proposal.draft.name}</h4>
-        <p>{proposal.previewSummary}</p>
+    <div className="ai-chat-custom-widget-proposal">
+      <div className="ai-chat-widget-option ai-chat-custom-widget-proposal-card">
+        <div className="ai-chat-widget-option-header">
+          <span className="ai-chat-widget-option-name">{proposal.draft.name}</span>
+        </div>
+        <AiChatCustomWidgetPreview draft={proposal.draft} />
       </div>
-      <AiChatRecommendationRationales
-        items={proposal.rationale}
-        preview={<AiChatCustomWidgetPreview draft={proposal.draft} />}
-        title="Proposed setup"
-      />
       {proposal.supportsLiveData ? (
-        <div className="ai-chat-assistant-proposal-actions ai-chat-assistant-proposal-actions-stacked">
+        <div className="ai-chat-custom-widget-proposal-actions">
           {saved ? (
             <>
               <span className="ai-chat-assistant-proposal-status" role="status">
@@ -376,17 +403,17 @@ function AiChatCustomWidgetProposal({
                 {origin === "custom-widgets-library" ? "Saved" : "Added"}
               </span>
               <button
-                className="ai-chat-preview-undo"
+                className="ai-chat-preview-regenerate"
                 onClick={() =>
                   onViewCustomWidgets?.(savedAccess === "tenant" ? "shared" : "my")
                 }
                 type="button"
               >
-                View in Custom Widgets
+                View In Custom Widgets
               </button>
             </>
           ) : origin === "custom-widgets-library" ? (
-            <div className="ai-chat-assistant-proposal-actions ai-chat-assistant-proposal-actions-library">
+            <div className="ai-chat-custom-widget-proposal-actions-library">
               <button
                 className="ai-chat-preview-regenerate"
                 onClick={() => onSaveWidget?.(messageId, proposal, "private")}
@@ -413,6 +440,10 @@ function AiChatCustomWidgetProposal({
           )}
         </div>
       ) : null}
+      <div className="ai-chat-custom-widget-proposal-details">
+        <p className="ai-chat-custom-widget-proposal-summary">{proposal.previewSummary}</p>
+        <AiChatRecommendationRationales items={proposal.rationale} title="Proposed setup" />
+      </div>
     </div>
   );
 }
@@ -498,11 +529,13 @@ function AiChatPreviewCard({
   const isAiGeneratedHomepage = preview?.kind === "ai-generated-homepage";
 
   return (
-    <div className="ai-chat-preview-card" data-node-id="225:41340">
-      <AiChatHomepagePreview
-        libraryWidgetIds={isAiGeneratedHomepage ? preview.libraryWidgetIds : undefined}
-        variant={isAiGeneratedHomepage ? preview.variant : undefined}
-      />
+    <div className="ai-chat-preview-block">
+      <div className="ai-chat-preview-card" data-node-id="225:41340">
+        <AiChatHomepagePreview
+          libraryWidgetIds={isAiGeneratedHomepage ? preview.libraryWidgetIds : undefined}
+          variant={isAiGeneratedHomepage ? preview.variant : undefined}
+        />
+      </div>
       <div className="ai-chat-preview-actions">
         {previewApplied ? (
           <Tooltip title="Revert to your previous homepage configuration.">
@@ -513,7 +546,7 @@ function AiChatPreviewCard({
         ) : (
           <Tooltip title="This action will replace your existing homepage configuration.">
             <button className="ai-chat-preview-apply" onClick={() => onApply(messageId)} type="button">
-              Apply
+              Apply to Homepage
             </button>
           </Tooltip>
         )}
