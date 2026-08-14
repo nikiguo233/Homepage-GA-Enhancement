@@ -20,7 +20,7 @@ export function HomepageCustomWidgets({
   }
 
   return (
-    <>
+    <div className="homepage-custom-widget-grid">
       {visibleCustomWidgetIds.map((widgetId) => {
         const parsedRef = parseCustomWidgetRef(widgetId);
         const widget = parsedRef ? getCustomWidgetById(parsedRef.widgetId) : undefined;
@@ -38,6 +38,6 @@ export function HomepageCustomWidgets({
           />
         );
       })}
-    </>
+    </div>
   );
 }

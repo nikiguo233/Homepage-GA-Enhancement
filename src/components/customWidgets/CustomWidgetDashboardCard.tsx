@@ -19,15 +19,9 @@ export const CustomWidgetDashboardCard = forwardRef<
     size: displaySize ?? widget.size,
   });
   const { cols } = parseWidgetSize(size);
-  const cardClassName = [
-    "widget-card",
-    "custom-widget-dashboard-card",
-    cols > 3 ? "custom-widget-dashboard-card-wide" : "",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const cardClassName = ["widget-card", "custom-widget-dashboard-card", className].filter(Boolean).join(" ");
   const cardStyle = {
+    "--custom-widget-dashboard-cols": cols,
     "--custom-widget-dashboard-height": `${getWidgetDashboardCardHeight(size)}px`,
   } as CSSProperties;
   const previewWidget = {

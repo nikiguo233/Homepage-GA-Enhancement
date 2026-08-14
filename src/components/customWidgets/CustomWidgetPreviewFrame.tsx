@@ -24,6 +24,7 @@ type EmbedLoadState = "idle" | "loading" | "ready" | "unavailable";
 export function CustomWidgetPreviewFrame({
   compact = false,
   dense = false,
+  editorPreview = false,
   fillContainer = false,
   gridFit = false,
   interactive,
@@ -33,6 +34,7 @@ export function CustomWidgetPreviewFrame({
 }: {
   compact?: boolean;
   dense?: boolean;
+  editorPreview?: boolean;
   fillContainer?: boolean;
   gridFit?: boolean;
   interactive?: boolean;
@@ -58,7 +60,7 @@ export function CustomWidgetPreviewFrame({
   const isInteractive = interactive ?? !compact;
   const isInteractiveEmbed = widget.type === "embed" && isInteractive;
   const { width: designWidth, height: designHeight } = gridFit
-    ? getWidgetGridSlotDimensions(size, { editorPreview: true })
+    ? getWidgetGridSlotDimensions(size, { editorPreview })
     : getWidgetDesignDimensions(size);
   const embedValidation =
     widget.type === "embed" ? validateEmbedUrl(widget.content) : null;
@@ -333,6 +335,7 @@ export function CustomWidgetPreviewFrame({
         scrolling={compact ? "no" : "auto"}
         srcDoc={buildWidgetPreviewDocument(widget.content, size, compact, {
           dense,
+          editorPreview,
           gridFit,
           scrollable,
           useLiveData: usesLiveData,

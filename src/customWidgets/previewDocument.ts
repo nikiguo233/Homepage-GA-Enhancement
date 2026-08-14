@@ -8,10 +8,16 @@ export function buildWidgetPreviewDocument(
   content: string,
   size: CustomWidgetSize,
   compact = false,
-  options?: { dense?: boolean; gridFit?: boolean; scrollable?: boolean; useLiveData?: boolean },
+  options?: {
+    dense?: boolean;
+    editorPreview?: boolean;
+    gridFit?: boolean;
+    scrollable?: boolean;
+    useLiveData?: boolean;
+  },
 ) {
   const { height } = options?.gridFit
-    ? getWidgetGridSlotDimensions(size, { editorPreview: true })
+    ? getWidgetGridSlotDimensions(size, { editorPreview: options?.editorPreview })
     : getWidgetDesignDimensions(size);
   const gridFit = options?.gridFit ?? false;
   const scrollable = options?.scrollable ?? false;

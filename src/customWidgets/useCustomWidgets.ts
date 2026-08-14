@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { normalizeStoredAiGeneratedMetricWidget } from "./aiGeneratedMetricWidgets";
 import { isAiGeneratedCustomWidget } from "./isAiGeneratedCustomWidget";
-import { DEFAULT_CUSTOM_WIDGET_HTML, DEFAULT_EMBED_URL } from "./defaultTemplate";
+import { DEFAULT_EMBED_URL } from "./defaultTemplate";
 import { createDefaultEmbedConfig, normalizeEmbedConfig } from "./embedConfig";
 import type {
   CustomWidget,
@@ -12,7 +12,7 @@ import type {
 import { buildHistoryEntry, buildSaveHistoryEntry, CURRENT_WIDGET_ACTOR } from "./widgetHistory";
 import { normalizeCustomWidgetAccess } from "./widgetAccess";
 import { normalizeWidgetDataBinding } from "./widgetDataBinding";
-import { DEFAULT_SUPPORTED_WIDGET_SIZES, normalizeSupportedWidgetSizes, normalizeWidgetSize } from "./widgetSizes";
+import { normalizeSupportedWidgetSizes, normalizeWidgetSize } from "./widgetSizes";
 
 const STORAGE_KEY = "zuora-custom-widgets";
 const HISTORY_STORAGE_KEY = "zuora-custom-widget-history";
@@ -88,9 +88,9 @@ export function createEmptyCustomWidgetDraft(
     name: "",
     description: "",
     type,
-    content: type === "html" ? DEFAULT_CUSTOM_WIDGET_HTML : DEFAULT_EMBED_URL,
+    content: type === "html" ? "" : DEFAULT_EMBED_URL,
     size: "3x3",
-    supportedSizes: [...DEFAULT_SUPPORTED_WIDGET_SIZES],
+    supportedSizes: [],
     access: "private",
     labelAsExternalContent: type === "embed",
     displayWidgetName: false,

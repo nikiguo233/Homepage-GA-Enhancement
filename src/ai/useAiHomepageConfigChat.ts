@@ -27,6 +27,7 @@ import type {
   TeamTemplateProposal,
   ThinkingProcess,
 } from "./types";
+import { findChatSession, saveChatSession } from "../search/chatSessionStorage";
 
 function createMessageId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -165,6 +166,34 @@ export function useAiHomepageConfigChat(options: {
       });
     },
     [startChat],
+  );
+
+  const openChatHistory = useCallback(
+    (prompt: string) => {
+      const trimmed = prompt.trim();
+
+      if (!trimmed) {
+        openChat();
+        return;
+      }
+
+      const session = findChatSession(trimmed);
+
+      if (session) {
+        requestIdRef.current += 1;
+        setThinkingProcess(null);
+        setMessages(session.messages);
+        setSuggestionContext(session.context);
+        setInputMessage("");
+        setShowEmptyStateSuggestions(false);
+        pendingChatPromptRef.current = null;
+        setAiChatOpen(true);
+        return;
+      }
+
+      startChatWithPrompt(trimmed, { context: "homepage", showEmptyStateSuggestions: false });
+    },
+    [openChat, startChatWithPrompt],
   );
 
   const closeChat = useCallback(() => {
@@ -312,6 +341,16 @@ export function useAiHomepageConfigChat(options: {
     pendingChatPromptRef.current = null;
     void respondToPrompt(prompt);
   }, [aiChatOpen, respondToPrompt]);
+
+  useEffect(() => {
+    const firstUserMessage = messages.find((message) => message.role === "user");
+
+    if (!firstUserMessage) {
+      return;
+    }
+
+    saveChatSession(firstUserMessage.content, messages, suggestionContext);
+  }, [messages, suggestionContext]);
 
   const handleSuggestedAction = useCallback(
     (action: SuggestedAction) => {
@@ -510,6 +549,7 @@ export function useAiHomepageConfigChat(options: {
     messages,
     onInputMessageChange: setInputMessage,
     openChat,
+    openChatHistory,
     resetConversation,
     showEmptyStateSuggestions,
     startChat,

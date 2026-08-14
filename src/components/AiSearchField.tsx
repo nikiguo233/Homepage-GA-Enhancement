@@ -38,6 +38,7 @@ export function AiSearchField({
   compact = false,
   hidden = false,
   onOpenAi,
+  onOpenChatHistory,
   onSubmitToAi,
   placeholder = "Search or ask a question",
   tabIndex,
@@ -46,6 +47,7 @@ export function AiSearchField({
   compact?: boolean;
   hidden?: boolean;
   onOpenAi?: () => void;
+  onOpenChatHistory?: (prompt: string) => void;
   onSubmitToAi: (prompt: string) => void;
   placeholder?: string;
   tabIndex?: number;
@@ -177,8 +179,10 @@ export function AiSearchField({
   };
 
   const handleSelectHistory = (entry: string) => {
-    setQuery(entry);
-    inputRef.current?.focus();
+    setQuery("");
+    setIsInputFocused(false);
+    setIsOpen(false);
+    onOpenChatHistory?.(entry);
   };
 
   const handleRemoveHistory = (entry: string, event: ReactMouseEvent<HTMLButtonElement>) => {

@@ -5,7 +5,7 @@ import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_CUSTOM_WIDGET_HTML, DEFAULT_EMBED_URL } from "../../customWidgets/defaultTemplate";
+import { DEFAULT_EMBED_URL } from "../../customWidgets/defaultTemplate";
 import { validateEmbedUrl } from "../../customWidgets/embedPolicy";
 import { ENABLE_LABEL_AS_EXTERNAL_CONTENT } from "../../customWidgets/featureFlags";
 import {
@@ -95,6 +95,35 @@ function buildEmbedSaveDraft(draft: CustomWidgetDraft): CustomWidgetDraft {
   };
 }
 
+function isHtmlContentEmpty(content: string) {
+  return content.trim().length === 0;
+}
+
+function getEmbedPreviewEmptyMessage(
+  connection: TableauConnectionSettings,
+  connectionVerified: boolean,
+  embedValid: boolean,
+) {
+  if (!isTableauConnectionStepValid(connection)) {
+    return "Complete configuration to preview your widget.";
+  }
+
+  if (!connectionVerified || !embedValid) {
+    return "Test connection to preview your widget.";
+  }
+
+  return "Complete configuration to preview your widget.";
+}
+
+function buildHtmlGenerateCodePrompt(draft: CustomWidgetDraft) {
+  const widgetName = draft.name.trim() || "custom HTML widget";
+  const description = draft.description.trim();
+
+  return description
+    ? `Generate HTML code for the "${widgetName}" widget. ${description}`
+    : `Generate HTML code for the "${widgetName}" custom HTML widget.`;
+}
+
 export function CustomWidgetEditor({
   aiChatOpen = false,
   initialDraft,
@@ -112,7 +141,7 @@ export function CustomWidgetEditor({
   isEditing: boolean;
   onClose: () => void;
   onDelete?: () => void;
-  onOpenAiChat?: () => void;
+  onOpenAiChat?: (draftMessage?: string) => void;
   onSave: (draft: CustomWidgetDraft) => void;
   widgetId: string | null;
 }) {
@@ -151,23 +180,24 @@ export function CustomWidgetEditor({
     setStep(initialStep);
     setEmbedConnectionVerified(isEmbedConnectionVerified(nextDraft));
     setConnectionTestMessage(null);
-  }, [widgetId]);
+    setShowCode(true);
+  }, [initialStep, isEditing, widgetId]);
 
   const embedValidation = useMemo(
     () => (draft.type === "embed" ? validateEmbedUrl(draft.content) : null),
     [draft.content, draft.type],
   );
-  const canAccessConfigure = useMemo(
+  const canContinueToConfigure = useMemo(() => isBasicInfoValid(draft), [draft]);
+  const hasValidSupportedSizes = useMemo(
     () =>
-      isBasicInfoValid(draft) &&
       draft.supportedSizes.length > 0 &&
       draft.supportedSizes.every(isValidWidgetSize) &&
       draft.supportedSizes.includes(draft.size),
     [draft],
   );
   const canSave = useMemo(
-    () => canAccessConfigure && isEmbedConfigValid(draft),
-    [canAccessConfigure, draft],
+    () => canContinueToConfigure && hasValidSupportedSizes && isEmbedConfigValid(draft),
+    [canContinueToConfigure, draft, hasValidSupportedSizes],
   );
   const embedConfig = useMemo(() => normalizeEmbedConfig(draft), [draft]);
   const showEmbedPreview =
@@ -203,6 +233,18 @@ export function CustomWidgetEditor({
       embedConfig.tableauConnection,
     ],
   );
+  const showHtmlEmptyState =
+    !isEditing && draft.type === "html" && isHtmlContentEmpty(draft.content);
+  const showEmbedEmptyState =
+    !isEditing &&
+    draft.type === "embed" &&
+    (!isTableauConnectionStepValid(embedConfig.tableauConnection) ||
+      !embedValidation?.valid ||
+      !embedConnectionVerified);
+  const showPreviewEmptyState = showHtmlEmptyState || showEmbedEmptyState;
+  const handleGenerateCodeWithAi = () => {
+    onOpenAiChat?.(buildHtmlGenerateCodePrompt(draft));
+  };
   const dataBindingSummary = draft.dataBinding
     ? getWidgetDataBindingQuerySummary(draft.dataBinding)
     : null;
@@ -215,10 +257,16 @@ export function CustomWidgetEditor({
     setEmbedConnectionVerified(false);
     setConnectionTestMessage(null);
     setDraft((current) => {
+      const nextContent =
+        type === "html"
+          ? current.type === "html"
+            ? current.content
+            : ""
+          : DEFAULT_EMBED_URL;
       const next: CustomWidgetDraft = {
         ...current,
         type,
-        content: type === "html" ? DEFAULT_CUSTOM_WIDGET_HTML : DEFAULT_EMBED_URL,
+        content: nextContent,
       };
 
       if (type === "html") {
@@ -310,12 +358,10 @@ export function CustomWidgetEditor({
       const isSelected = current.supportedSizes.includes(size);
 
       if (isSelected) {
-        if (current.supportedSizes.length <= 1) {
-          return current;
-        }
-
         const supportedSizes = current.supportedSizes.filter((entry) => entry !== size);
-        const nextSize = supportedSizes.includes(current.size) ? current.size : supportedSizes[0];
+        const nextSize = supportedSizes.includes(current.size)
+          ? current.size
+          : supportedSizes[0] ?? current.size;
 
         return { ...current, supportedSizes, size: nextSize };
       }
@@ -323,6 +369,7 @@ export function CustomWidgetEditor({
       return {
         ...current,
         supportedSizes: sortWidgetSizes([...current.supportedSizes, size]),
+        size: current.supportedSizes.length === 0 ? size : current.size,
       };
     });
   };
@@ -332,13 +379,9 @@ export function CustomWidgetEditor({
       const existingCustomSize = getCustomSupportedSize(current.supportedSizes);
 
       if (existingCustomSize) {
-        if (current.supportedSizes.length <= 1) {
-          return current;
-        }
-
         const supportedSizes = current.supportedSizes.filter((entry) => isPresetWidgetSize(entry));
         const nextSize =
-          supportedSizes.find((size) => size === current.size) ?? supportedSizes[0];
+          supportedSizes.find((size) => size === current.size) ?? supportedSizes[0] ?? current.size;
 
         return { ...current, supportedSizes, size: nextSize };
       }
@@ -450,7 +493,7 @@ export function CustomWidgetEditor({
           </button>
           <button
             className={`custom-widget-editor-tab${step === "configure" ? " is-active" : ""}`}
-            disabled={!canAccessConfigure}
+            disabled={!canContinueToConfigure}
             onClick={() => setStep("configure")}
             type="button"
           >
@@ -576,7 +619,7 @@ export function CustomWidgetEditor({
             <div className="custom-widget-basic-actions">
               <button
                 className="custom-widget-primary-button"
-                disabled={!canAccessConfigure}
+                disabled={!canContinueToConfigure}
                 onClick={() => setStep("configure")}
                 type="button"
               >
@@ -607,7 +650,7 @@ export function CustomWidgetEditor({
                 <AiButton
                   background="light"
                   className="custom-widget-generate-code-ai-button"
-                  onClick={onOpenAiChat}
+                  onClick={handleGenerateCodeWithAi}
                   size="small"
                   variant="secondary"
                 >
@@ -632,7 +675,6 @@ export function CustomWidgetEditor({
                     <label className="custom-widget-supported-size-option" key={size}>
                       <input
                         checked={isChecked}
-                  disabled={isChecked && draft.supportedSizes.length === 1}
                         onChange={() => handleToggleSupportedSize(size)}
                         type="checkbox"
                       />
@@ -643,7 +685,6 @@ export function CustomWidgetEditor({
                 <label className="custom-widget-supported-size-option">
                   <input
                     checked={isCustomSizeEnabled}
-                    disabled={isCustomSizeEnabled && draft.supportedSizes.length === 1}
                     onChange={handleToggleCustomSize}
                     type="checkbox"
                   />
@@ -735,34 +776,54 @@ export function CustomWidgetEditor({
                 />
               </>
             ) : null}
-            <div className="custom-widget-preview-panel">
-              <div className="custom-widget-preview-toolbar">
-                <label className="custom-widget-size-field">
-                  <span>Widget Size</span>
-                  <select
-                    onChange={(event) =>
-                      handlePreviewSizeChange(event.target.value as CustomWidgetSize)
-                    }
-                    value={draft.size}
-                  >
-                    {draft.supportedSizes.map((size) => (
-                      <option key={size} value={size}>
-                        {getWidgetSizeLabel(size)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="custom-widget-preview-stage">
-                {draft.supportedSizes.length === 0 ? (
+            <div className={`custom-widget-preview-panel${showPreviewEmptyState ? " is-preview-empty" : ""}`}>
+              {!showPreviewEmptyState ? (
+                <div className="custom-widget-preview-toolbar">
+                  <label className="custom-widget-size-field">
+                    <span>Widget Size</span>
+                    <select
+                      onChange={(event) =>
+                        handlePreviewSizeChange(event.target.value as CustomWidgetSize)
+                      }
+                      value={draft.size}
+                    >
+                      {draft.supportedSizes.map((size) => (
+                        <option key={size} value={size}>
+                          {getWidgetSizeLabel(size)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+              <div
+                className={`custom-widget-preview-stage${showPreviewEmptyState ? " is-preview-empty" : ""}`}
+              >
+                {showHtmlEmptyState ? (
+                  <div className="custom-widget-preview-empty-state">
+                    <div aria-hidden="true" className="custom-widget-preview-empty-state-icon">
+                      <CodeOutlinedIcon />
+                    </div>
+                    <p className="custom-widget-preview-empty-message">
+                      Add HTML code or generate with AI to preview your widget.
+                    </p>
+                  </div>
+                ) : showEmbedEmptyState ? (
+                  <div className="custom-widget-preview-empty-state">
+                    <div aria-hidden="true" className="custom-widget-preview-empty-state-icon">
+                      <LinkOutlinedIcon />
+                    </div>
+                    <p className="custom-widget-preview-empty-message">
+                      {getEmbedPreviewEmptyMessage(
+                        embedConfig.tableauConnection,
+                        embedConnectionVerified,
+                        Boolean(embedValidation?.valid),
+                      )}
+                    </p>
+                  </div>
+                ) : draft.supportedSizes.length === 0 ? (
                   <p className="custom-widget-preview-empty-message">
                     Select supported widget size to preview
-                  </p>
-                ) : draft.type === "embed" && !showEmbedPreview ? (
-                  <p className="custom-widget-preview-empty-message">
-                    {isTableauConnectionStepValid(embedConfig.tableauConnection)
-                      ? "Test connection to preview dashboard"
-                      : "Complete Tableau configuration to preview"}
                   </p>
                 ) : (
                   <WidgetEditorPreviewGrid previewWidget={previewWidget} size={previewWidget.size} />

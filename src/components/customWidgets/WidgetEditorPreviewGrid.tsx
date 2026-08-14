@@ -61,7 +61,7 @@ export function WidgetEditorPreviewGrid({
           gridRow: `1 / span ${rows}`,
         }}
       >
-        <CustomWidgetPreviewFrame gridFit interactive size={size} widget={previewWidget} />
+        <CustomWidgetPreviewFrame editorPreview gridFit interactive size={size} widget={previewWidget} />
       </div>
       {Array.from({ length: totalCells }, (_, index) => {
         if (occupiedCellIndexes.has(index)) {

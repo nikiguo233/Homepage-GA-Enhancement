@@ -2894,11 +2894,6 @@ a {
   line-height: 18px;
 }
 
-.widget-type-list-group-count {
-  color: var(--occam-color-cool-gray-500);
-  font-weight: 500;
-}
-
 .widget-type-list-group-chevron {
   flex: 0 0 auto;
   width: 20px;
@@ -4409,22 +4404,25 @@ a {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--occam-border-subtle);
-  border-radius: 12px;
-  background: var(--occam-color-white);
 }
 
-.ai-chat-cleanup-preview {
+.ai-chat-cleanup-proposal-card {
+  pointer-events: auto;
+}
+
+.ai-chat-cleanup-proposal-card .ai-chat-preview-thumbnail-button {
+  display: block;
   width: 100%;
 }
 
-.ai-chat-cleanup-preview .ai-chat-preview-thumbnail-button {
+.ai-chat-cleanup-proposal-card .ai-chat-preview-thumbnail {
   width: 100%;
 }
 
-.ai-chat-cleanup-preview .ai-chat-preview-thumbnail {
-  width: 100%;
+.ai-chat-cleanup-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .ai-chat-cleanup-section h4 {
@@ -4480,7 +4478,19 @@ a {
 
 .ai-chat-cleanup-actions {
   display: flex;
+  flex-direction: column;
   gap: 8px;
+  width: 100%;
+}
+
+.ai-chat-cleanup-actions > span {
+  display: flex;
+  width: 100%;
+}
+
+.ai-chat-cleanup-actions .ai-chat-preview-apply,
+.ai-chat-cleanup-actions .ai-chat-preview-undo {
+  width: 100%;
 }
 
 .ai-chat-custom-widget-proposal {
@@ -4537,14 +4547,15 @@ a {
 
 .ai-chat-custom-widget-proposal-actions-library {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: stretch;
   gap: 8px;
   width: 100%;
 }
 
 .ai-chat-custom-widget-proposal-actions-library .ai-chat-preview-regenerate,
 .ai-chat-custom-widget-proposal-actions-library .ai-chat-preview-apply {
+  flex: 1;
   width: auto;
 }
 

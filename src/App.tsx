@@ -964,15 +964,18 @@ function StickyHeader({ active, visible }: { active: boolean; visible: boolean }
 
 function MorphingSearchField({
   onOpenAi,
+  onOpenChatHistory,
   onSubmitToAi,
 }: {
   onOpenAi: () => void;
+  onOpenChatHistory: (prompt: string) => void;
   onSubmitToAi: (prompt: string) => void;
 }) {
   return (
     <AiSearchField
       className="morphing-search-control"
       onOpenAi={onOpenAi}
+      onOpenChatHistory={onOpenChatHistory}
       onSubmitToAi={onSubmitToAi}
     />
   );
@@ -1119,13 +1122,11 @@ function CustomWidgetTypeCard({
 
 function WidgetTypeListGroup({
   children,
-  count,
   expanded,
   onToggle,
   title,
 }: {
   children: ReactNode;
-  count: number;
   expanded: boolean;
   onToggle: () => void;
   title: string;
@@ -1141,9 +1142,7 @@ function WidgetTypeListGroup({
         onClick={onToggle}
         type="button"
       >
-        <span className="widget-type-list-group-title">
-          {title} <span className="widget-type-list-group-count">({count})</span>
-        </span>
+        <span className="widget-type-list-group-title">{title}</span>
         <ExpandMoreIcon aria-hidden="true" className="widget-type-list-group-chevron" />
       </button>
       {expanded ? (
@@ -1228,10 +1227,9 @@ function AddWidgetPanel({
       <div className="widget-type-list">
         {showStandardGroup ? (
           <WidgetTypeListGroup
-            count={visibleWidgets.length}
             expanded={standardWidgetsExpanded}
             onToggle={() => setStandardWidgetsExpanded((current) => !current)}
-            title="Standard widgets"
+            title="Standard Widgets"
           >
             {visibleWidgets.map((widget) => (
               <WidgetTypeCard
@@ -1246,10 +1244,9 @@ function AddWidgetPanel({
         ) : null}
         {showCustomGroup ? (
           <WidgetTypeListGroup
-            count={visibleCustomWidgets.length}
             expanded={customWidgetsExpanded}
             onToggle={() => setCustomWidgetsExpanded((current) => !current)}
-            title="Custom widgets"
+            title="Custom Widgets"
           >
             {visibleCustomWidgets.map((widget) => (
               <CustomWidgetTypeCard
@@ -2051,6 +2048,7 @@ export function App() {
     messages,
     onInputMessageChange,
     openChat,
+    openChatHistory,
     showEmptyStateSuggestions,
     startChat,
     startChatWithPrompt,
@@ -2222,6 +2220,7 @@ export function App() {
         context: "custom-widget",
         draftMessage: draftMessage ?? `Help me update the "${widgetName}" widget`,
         reset: true,
+        showEmptyStateSuggestions: !draftMessage,
       });
     },
     [aiSuggestedWidgetDraft?.name, editingWidgetId, getWidgetById, startChat],
@@ -2730,6 +2729,7 @@ export function App() {
         {isHomeView ? (
           <MorphingSearchField
             onOpenAi={openChat}
+            onOpenChatHistory={openChatHistory}
             onSubmitToAi={(prompt) => startChatWithPrompt(prompt, { context: "homepage" })}
           />
         ) : null}

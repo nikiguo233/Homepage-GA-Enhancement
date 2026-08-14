@@ -278,7 +278,7 @@ function AiChatWidgetRecommendations({
         onClick={handleAdd}
         type="button"
       >
-        Add Selected
+        Add Selected{selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}
       </button>
     </div>
   );
@@ -321,30 +321,8 @@ function AiChatCleanupProposal({
 
   return (
     <div className="ai-chat-cleanup-proposal">
-      <div className="ai-chat-cleanup-preview">
+      <div className="ai-chat-widget-option ai-chat-cleanup-proposal-card">
         <AiChatCleanupHomepagePreview proposal={proposal} />
-      </div>
-      {proposal.removals.length > 0 ? (
-        <div className="ai-chat-cleanup-section">
-          <h4>Moved down to prioritize top metrics</h4>
-          <ul className="ai-chat-cleanup-list ai-chat-cleanup-removal-list">
-            {proposal.removals.map((removal) => (
-              <li className="ai-chat-cleanup-removal-item" key={removal.id}>
-                <strong>{removal.name}</strong>
-                <p>{removal.reason}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      <div className="ai-chat-cleanup-section">
-        <h4>Updated layout</h4>
-        <p className="ai-chat-cleanup-layout-reason">{proposal.layoutReason}</p>
-        <ol className="ai-chat-cleanup-ordered-list">
-          {layoutItems.map((name) => (
-            <li key={name}>{name}</li>
-          ))}
-        </ol>
       </div>
       <div className="ai-chat-cleanup-actions">
         {applied ? (
@@ -364,6 +342,30 @@ function AiChatCleanupProposal({
             </button>
           </Tooltip>
         )}
+      </div>
+      <div className="ai-chat-cleanup-details">
+        {proposal.removals.length > 0 ? (
+          <div className="ai-chat-cleanup-section">
+            <h4>Moved down to prioritize top metrics</h4>
+            <ul className="ai-chat-cleanup-list ai-chat-cleanup-removal-list">
+              {proposal.removals.map((removal) => (
+                <li className="ai-chat-cleanup-removal-item" key={removal.id}>
+                  <strong>{removal.name}</strong>
+                  <p>{removal.reason}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <div className="ai-chat-cleanup-section">
+          <h4>Updated layout</h4>
+          <p className="ai-chat-cleanup-layout-reason">{proposal.layoutReason}</p>
+          <ol className="ai-chat-cleanup-ordered-list">
+            {layoutItems.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );
@@ -415,14 +417,14 @@ function AiChatCustomWidgetProposal({
           ) : origin === "custom-widgets-library" ? (
             <div className="ai-chat-custom-widget-proposal-actions-library">
               <button
-                className="ai-chat-preview-regenerate"
+                className="ai-chat-preview-apply"
                 onClick={() => onSaveWidget?.(messageId, proposal, "private")}
                 type="button"
               >
                 Save Widget
               </button>
               <button
-                className="ai-chat-preview-apply"
+                className="ai-chat-preview-regenerate"
                 onClick={() => onSaveWidget?.(messageId, proposal, "tenant")}
                 type="button"
               >
