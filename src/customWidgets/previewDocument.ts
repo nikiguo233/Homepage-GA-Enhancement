@@ -68,6 +68,10 @@ export function buildWidgetPreviewDocument(
       max-width: none !important;
       box-sizing: border-box;
     }
+
+    .header {
+      padding-right: 36px;
+    }
   </style>`
       : `<style ${PREVIEW_ADAPTOR_ATTR}>
     html, body {

@@ -39,6 +39,7 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -61,6 +62,10 @@ import { AiGeneratedDashboard } from "./components/AiGeneratedDashboard";
 import { DashboardWidget } from "./components/dashboardWidgets/DashboardWidgets";
 import type { DashboardWidgetId } from "./components/dashboardWidgets/catalog";
 import { HomepageEmptyState } from "./components/HomepageEmptyState";
+import {
+  HomepageWidgetActionsProvider,
+  createHomepageWidgetActions,
+} from "./components/HomepageWidgetActions";
 import { OnboardingScreen, type OnboardingTemplateId } from "./components/OnboardingScreen";
 import { getCurrentDashboardWidgetIds } from "./homepageConfig/homepageCleanup";
 import type { HomepageCleanupPlan } from "./homepageConfig/homepageCleanup";
@@ -89,7 +94,7 @@ import {
   getCustomWidgetVisibilityChipLabel,
   normalizeCustomWidgetAccess,
 } from "./customWidgets/widgetAccess";
-import { createCustomWidgetRefId } from "./customWidgets/types";
+import { createCustomWidgetRefId, parseCustomWidgetRef } from "./customWidgets/types";
 import type { CustomWidget, CustomWidgetAccess, CustomWidgetDraft, CustomWidgetSize } from "./customWidgets/types";
 import { saveAiGeneratedHomepageMetricWidgets } from "./customWidgets/aiGeneratedMetricWidgets";
 import { useCustomWidgets } from "./customWidgets/useCustomWidgets";
@@ -1325,6 +1330,7 @@ function WidgetDrawer({
   configureCustomWidgetSize,
   configureKind,
   configuringCustomWidget,
+  customWidgetConfirmLabel,
   customWidgets,
   onAddRevenueProgress,
   onBackToSelect,
@@ -1342,6 +1348,7 @@ function WidgetDrawer({
   configureCustomWidgetSize: CustomWidgetSize;
   configureKind: WidgetDrawerConfigureKind;
   configuringCustomWidget: CustomWidget | undefined;
+  customWidgetConfirmLabel: string;
   customWidgets: CustomWidget[];
   onAddRevenueProgress: () => void;
   onBackToSelect: () => void;
@@ -1373,6 +1380,7 @@ function WidgetDrawer({
   if (configureKind === "custom-widget" && configuringCustomWidget) {
     return (
       <ConfigureCustomWidgetPanel
+        confirmLabel={customWidgetConfirmLabel}
         onAdd={onConfirmAddCustomWidget}
         onBack={onBackToSelect}
         onClose={onClose}
@@ -1627,7 +1635,7 @@ function FeedbackToast({
           ) : null}
           {showViewWidget && onViewWidget ? (
             <button className="feedback-toast-action" type="button" onClick={onViewWidget}>
-              view Widget
+              View Widget
             </button>
           ) : null}
           <button className="feedback-toast-close" type="button" aria-label="Dismiss notification" onClick={onClose}>
@@ -1740,6 +1748,7 @@ export function App() {
     isAiGenerated,
     layout,
     metricCardOrder,
+    removeWidget,
     removedWidgetIds,
     resetToDefaultLayout,
     undoCleanup,
@@ -1893,11 +1902,19 @@ export function App() {
         return widgetId;
       }
 
-      const refId = createCustomWidgetRefId(widgetId, liveProposal.draft.size);
-      addWidgets([refId]);
-      setHighlightedWidgetRefId(refId);
+      setHomepageView("home");
+      setReplacingHomepageWidgetRefId(null);
+      setWidgetDrawerConfigureEntry("direct");
+      setWidgetDrawerConfigureKind("custom-widget");
+      setConfiguringCustomWidgetId(widgetId);
+      setConfigureCustomWidgetSize(
+        liveProposal.draft.size && liveProposal.draft.supportedSizes.includes(liveProposal.draft.size)
+          ? liveProposal.draft.size
+          : liveProposal.draft.supportedSizes[0] ?? liveProposal.draft.size,
+      );
+      setWidgetDrawerStep("configure");
 
-      showFeedbackToast(`${widgetName} is added.`);
+      showFeedbackToast(`${widgetName} is ready to add.`);
 
       return widgetId;
     },
@@ -1923,10 +1940,19 @@ export function App() {
       setShowOnboarding(false);
 
       if (isAiGeneratedCustomWidget(widget)) {
-        setEditingWidgetId(widgetId);
-        setAiSuggestedWidgetDraft(null);
-        setAiSuggestedEditorStep("basic");
-        setHomepageView("edit-widget");
+        if (!widget || widget.supportedSizes.length === 0) {
+          return;
+        }
+
+        setHomepageView("home");
+        setReplacingHomepageWidgetRefId(null);
+        setWidgetDrawerConfigureEntry("direct");
+        setWidgetDrawerConfigureKind("custom-widget");
+        setConfiguringCustomWidgetId(widgetId);
+        setConfigureCustomWidgetSize(
+          widget.supportedSizes.includes(widget.size) ? widget.size : widget.supportedSizes[0],
+        );
+        setWidgetDrawerStep("configure");
         return;
       }
 
@@ -2086,6 +2112,7 @@ export function App() {
   const [widgetDrawerConfigureEntry, setWidgetDrawerConfigureEntry] =
     useState<WidgetDrawerConfigureEntry>("select");
   const [widgetSearchQuery, setWidgetSearchQuery] = useState("");
+  const [replacingHomepageWidgetRefId, setReplacingHomepageWidgetRefId] = useState<string | null>(null);
   const [highlightedWidgetRefId, setHighlightedWidgetRefId] = useState<string | null>(null);
   const [notificationBannerVisible, setNotificationBannerVisible] = useState(true);
   const addedWidgetRef = useRef<HTMLElement | null>(null);
@@ -2118,6 +2145,38 @@ export function App() {
   );
   const welcomeOutProgress = easeInOut(rangeProgress(progress, 0.08, 0.55));
   const welcomeTitleMorphY = useWelcomeHeroMorphY(bannerAffectsHero, homepageActive, scrollRef);
+
+  const openCustomWidgetHomepageDrawer = useCallback(
+    (
+      widgetId: string,
+      options?: {
+        entry?: WidgetDrawerConfigureEntry;
+        replacingHomepageWidgetRefId?: string | null;
+        size?: CustomWidgetSize;
+      },
+    ) => {
+      const widget = getWidgetById(widgetId);
+
+      if (!widget || widget.supportedSizes.length === 0) {
+        return;
+      }
+
+      const preferredSize =
+        options?.size && widget.supportedSizes.includes(options.size)
+          ? options.size
+          : widget.supportedSizes.includes(widget.size)
+            ? widget.size
+            : widget.supportedSizes[0];
+
+      setWidgetDrawerConfigureEntry(options?.entry ?? "direct");
+      setWidgetDrawerConfigureKind("custom-widget");
+      setConfiguringCustomWidgetId(widgetId);
+      setConfigureCustomWidgetSize(preferredSize);
+      setReplacingHomepageWidgetRefId(options?.replacingHomepageWidgetRefId ?? null);
+      setWidgetDrawerStep("configure");
+    },
+    [getWidgetById],
+  );
 
   const handleSelectOnboardingTemplate = useCallback(
     (_templateId: OnboardingTemplateId) => {
@@ -2251,12 +2310,62 @@ export function App() {
     [startChat],
   );
 
-  const handleEditCustomWidget = useCallback((widgetId: string) => {
-    setEditingWidgetId(widgetId);
-    setAiSuggestedWidgetDraft(null);
-    setAiSuggestedEditorStep(null);
-    setHomepageView("edit-widget");
-  }, []);
+  const handleEditCustomWidget = useCallback(
+    (widgetId: string) => {
+      const widget = getWidgetById(widgetId);
+
+      if (widget && isAiGeneratedCustomWidget(widget)) {
+        openCustomWidgetHomepageDrawer(widgetId, { entry: "direct" });
+        return;
+      }
+
+      setEditingWidgetId(widgetId);
+      setAiSuggestedWidgetDraft(null);
+      setAiSuggestedEditorStep(null);
+      setHomepageView("edit-widget");
+    },
+    [getWidgetById, openCustomWidgetHomepageDrawer],
+  );
+
+  const handleEditHomepageWidget = useCallback(
+    (widgetRefId: string) => {
+      const parsed = parseCustomWidgetRef(widgetRefId);
+
+      if (!parsed) {
+        return;
+      }
+
+      const widget = getWidgetById(parsed.widgetId);
+
+      if (widget && isAiGeneratedCustomWidget(widget)) {
+        openCustomWidgetHomepageDrawer(parsed.widgetId, {
+          entry: "direct",
+          replacingHomepageWidgetRefId: widgetRefId,
+          size: parsed.size,
+        });
+        return;
+      }
+
+      handleEditCustomWidget(parsed.widgetId);
+    },
+    [getWidgetById, handleEditCustomWidget, openCustomWidgetHomepageDrawer],
+  );
+
+  const handleRemoveHomepageWidget = useCallback(
+    (widgetId: string) => {
+      removeWidget(widgetId);
+    },
+    [removeWidget],
+  );
+
+  const homepageWidgetActions = useMemo(
+    () =>
+      createHomepageWidgetActions({
+        onEditWidget: handleEditHomepageWidget,
+        onRemoveWidget: handleRemoveHomepageWidget,
+      }),
+    [handleEditHomepageWidget, handleRemoveHomepageWidget],
+  );
 
   const handleCloseCustomWidgetEditor = useCallback(() => {
     setHomepageView("manage-custom-widgets");
@@ -2376,6 +2485,13 @@ export function App() {
   const handleAddCustomWidgetToHomepage = useCallback(
     (widgetId: string, size: CustomWidgetSize) => {
       const refId = createCustomWidgetRefId(widgetId, size);
+      const isReplacing = Boolean(replacingHomepageWidgetRefId);
+
+      if (replacingHomepageWidgetRefId) {
+        removeWidget(replacingHomepageWidgetRefId);
+        setReplacingHomepageWidgetRefId(null);
+      }
+
       addWidgets([refId]);
       setHighlightedWidgetRefId(refId);
       setWidgetDrawerStep("closed");
@@ -2385,30 +2501,14 @@ export function App() {
       setWidgetDrawerConfigureKind("revenue-progress");
 
       const widget = getWidgetById(widgetId);
-      showFeedbackToast(`${widget?.name?.trim() || "Custom widget"} has been added.`, {
-        showViewWidgetAction: true,
-      });
-    },
-    [addWidgets, getWidgetById, showFeedbackToast],
-  );
-
-  const openCustomWidgetHomepageDrawer = useCallback(
-    (widgetId: string) => {
-      const widget = getWidgetById(widgetId);
-
-      if (!widget || widget.supportedSizes.length === 0) {
-        return;
-      }
-
-      setWidgetDrawerConfigureEntry("direct");
-      setWidgetDrawerConfigureKind("custom-widget");
-      setConfiguringCustomWidgetId(widgetId);
-      setConfigureCustomWidgetSize(
-        widget.supportedSizes.includes(widget.size) ? widget.size : widget.supportedSizes[0],
+      showFeedbackToast(
+        isReplacing
+          ? `${widget?.name?.trim() || "Custom widget"} has been updated.`
+          : `${widget?.name?.trim() || "Custom widget"} has been added.`,
+        { showViewWidgetAction: true },
       );
-      setWidgetDrawerStep("configure");
     },
-    [getWidgetById],
+    [addWidgets, getWidgetById, removeWidget, replacingHomepageWidgetRefId, showFeedbackToast],
   );
 
   const handleSelectCustomWidget = useCallback(
@@ -2419,6 +2519,7 @@ export function App() {
         return;
       }
 
+      setReplacingHomepageWidgetRefId(null);
       setWidgetDrawerConfigureEntry("select");
       setWidgetDrawerConfigureKind("custom-widget");
       setConfiguringCustomWidgetId(widgetId);
@@ -2448,6 +2549,7 @@ export function App() {
     setWidgetDrawerStep("closed");
     setWidgetSearchQuery("");
     setConfiguringCustomWidgetId(null);
+    setReplacingHomepageWidgetRefId(null);
     setWidgetDrawerConfigureEntry("select");
     setWidgetDrawerConfigureKind("revenue-progress");
   }, [configuringCustomWidgetId]);
@@ -2484,6 +2586,7 @@ export function App() {
   const handleOpenAddWidgetPanel = () => {
     setWidgetSearchQuery("");
     setConfiguringCustomWidgetId(null);
+    setReplacingHomepageWidgetRefId(null);
     setWidgetDrawerConfigureEntry("select");
     setWidgetDrawerConfigureKind("revenue-progress");
     setWidgetDrawerStep("select");
@@ -2492,6 +2595,7 @@ export function App() {
     setWidgetDrawerStep("closed");
     setWidgetSearchQuery("");
     setConfiguringCustomWidgetId(null);
+    setReplacingHomepageWidgetRefId(null);
     setWidgetDrawerConfigureEntry("select");
     setWidgetDrawerConfigureKind("revenue-progress");
   };
@@ -2509,6 +2613,7 @@ export function App() {
   const handleBackToWidgetSelect = () => {
     setWidgetDrawerStep("select");
     setConfiguringCustomWidgetId(null);
+    setReplacingHomepageWidgetRefId(null);
     setWidgetDrawerConfigureEntry("select");
     setWidgetDrawerConfigureKind("revenue-progress");
   };
@@ -2594,6 +2699,7 @@ export function App() {
         setWidgetDrawerStep("closed");
         setWidgetSearchQuery("");
         setConfiguringCustomWidgetId(null);
+        setReplacingHomepageWidgetRefId(null);
         setWidgetDrawerConfigureEntry("select");
         setWidgetDrawerConfigureKind("revenue-progress");
       }
@@ -2750,6 +2856,7 @@ export function App() {
               configureCustomWidgetSize={configureCustomWidgetSize}
               configureKind={widgetDrawerConfigureKind}
               configuringCustomWidget={configuringCustomWidget}
+              customWidgetConfirmLabel={replacingHomepageWidgetRefId ? "Save" : "Add"}
               customWidgets={[...publishedWidgets, ...privateWidgets]}
               onAddRevenueProgress={handleConfirmAddRevenueProgress}
               onBackToSelect={handleConfigureBack}
@@ -2802,21 +2909,23 @@ export function App() {
               ) : null}
               <WelcomeSearch />
               {!isEmptyHomepage || hasAddedWidgets ? (
-                <DashboardGrid
-                  addedWidgetIds={addedWidgetIds}
-                  addedWidgetRef={addedWidgetRef}
-                  aiDashboardVariant={aiDashboardVariant}
-                  aiLibraryWidgetIds={aiLibraryWidgetIds}
-                  getCustomWidgetById={getWidgetById}
-                  hiddenMetricCardLabels={hiddenMetricCardLabels}
-                  highlightedWidgetRefId={highlightedWidgetRefId}
-                  isAiGenerated={isAiGenerated}
-                  metricCardOrder={metricCardOrder}
-                  removedWidgetIds={removedWidgetIds}
-                  revenueProgressAdded={revenueProgressAdded}
-                  startWithEmptyHomepage={isEmptyHomepage}
-                  widgetOrder={widgetOrder}
-                />
+                <HomepageWidgetActionsProvider value={homepageWidgetActions}>
+                  <DashboardGrid
+                    addedWidgetIds={addedWidgetIds}
+                    addedWidgetRef={addedWidgetRef}
+                    aiDashboardVariant={aiDashboardVariant}
+                    aiLibraryWidgetIds={aiLibraryWidgetIds}
+                    getCustomWidgetById={getWidgetById}
+                    hiddenMetricCardLabels={hiddenMetricCardLabels}
+                    highlightedWidgetRefId={highlightedWidgetRefId}
+                    isAiGenerated={isAiGenerated}
+                    metricCardOrder={metricCardOrder}
+                    removedWidgetIds={removedWidgetIds}
+                    revenueProgressAdded={revenueProgressAdded}
+                    startWithEmptyHomepage={isEmptyHomepage}
+                    widgetOrder={widgetOrder}
+                  />
+                </HomepageWidgetActionsProvider>
               ) : (
                 <HomepageEmptyState />
               )}

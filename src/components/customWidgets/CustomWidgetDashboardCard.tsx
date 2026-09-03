@@ -1,6 +1,7 @@
 import CloseIcon from "@mui/icons-material/Close";
 import { forwardRef } from "react";
 import type { CSSProperties } from "react";
+import { WidgetMoreMenuButton } from "../HomepageWidgetActions";
 import { getWidgetGridPreviewSize } from "../../customWidgets/aiGeneratedMetricWidgets";
 import type { CustomWidget, CustomWidgetSize } from "../../customWidgets/types";
 import { getWidgetDashboardCardHeight, parseWidgetSize } from "../../customWidgets/widgetSizes";
@@ -19,7 +20,6 @@ export const CustomWidgetDashboardCard = forwardRef<
     size: displaySize ?? widget.size,
   });
   const { cols } = parseWidgetSize(size);
-  const cardClassName = ["widget-card", "custom-widget-dashboard-card", className].filter(Boolean).join(" ");
   const cardStyle = {
     "--custom-widget-dashboard-cols": cols,
     "--custom-widget-dashboard-height": `${getWidgetDashboardCardHeight(size)}px`,
@@ -29,10 +29,14 @@ export const CustomWidgetDashboardCard = forwardRef<
     displayWidgetName: false,
   };
   const showCardHeader = widget.type === "embed" && !widget.displayWidgetName;
+  const cardClassName = ["widget-card", "custom-widget-dashboard-card", className].filter(Boolean).join(" ");
 
   return (
     <article className={cardClassName} ref={ref} style={cardStyle}>
       <div className="widget-card-inner widget-card-inner-gap-8">
+        <div className="custom-widget-dashboard-more-menu">
+          <WidgetMoreMenuButton />
+        </div>
         {showCardHeader ? (
           <header className="custom-widget-dashboard-header">
             <h3>{widget.name}</h3>

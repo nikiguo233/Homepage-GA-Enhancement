@@ -1,4 +1,9 @@
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import {
+  HomepageWidgetActionsProvider,
+  HomepageWidgetScope,
+  useHomepageWidgetActions,
+  WidgetMoreMenuButton,
+} from "./HomepageWidgetActions";
 import { useMemo, useState } from "react";
 import type { AiGeneratedDashboardVariant } from "../ai/types";
 import { AiAddedWidgets } from "./AiAddedWidgets";
@@ -6,6 +11,8 @@ import { DASHBOARD_WIDGET_CATALOG, type DashboardWidgetId } from "./dashboardWid
 import type { CustomWidget } from "../customWidgets/types";
 import type { RefObject } from "react";
 import { WidgetSourceBadge } from "./WidgetSourceBadge";
+
+const AI_REVENUE_TREND_WIDGET_ID = "ai-revenue-trend";
 
 const defaultMetricCards = [
   { change: "+12%", label: "Active Contracts", value: "1,284" },
@@ -110,9 +117,7 @@ function AiRevenueTrendChart({ showSourceBadge = false }: { showSourceBadge?: bo
           </div>
           <div className="header-actions">
             <span className="ai-trend-period">FY 2026</span>
-            <button aria-label="More actions" className="widget-icon-button" type="button">
-              <MoreHorizIcon />
-            </button>
+            <WidgetMoreMenuButton />
           </div>
         </div>
         <div
@@ -209,6 +214,8 @@ export function AiGeneratedDashboard({
   variant?: AiGeneratedDashboardVariant;
   widgetRef?: RefObject<HTMLElement | null>;
 }) {
+  const parentActions = useHomepageWidgetActions();
+  const [revenueTrendRemoved, setRevenueTrendRemoved] = useState(false);
   const metricCards = variant === "month-end-close" ? monthEndCloseMetricCards : defaultMetricCards;
   const defaultVisibleMetricCards = metricCards.filter(
     (card) => !hiddenMetricCardLabels.includes(card.label),
@@ -241,7 +248,29 @@ export function AiGeneratedDashboard({
     ];
   }, [addedDashboardWidgetIds, libraryWidgetIds]);
 
-  return (
+  const scopedActions = useMemo(() => {
+    if (!parentActions) {
+      return null;
+    }
+
+    return {
+      ...parentActions,
+      canEditWidget: (widgetId: string) =>
+        widgetId !== AI_REVENUE_TREND_WIDGET_ID && parentActions.canEditWidget(widgetId),
+      canRemoveWidget: (widgetId: string) =>
+        widgetId === AI_REVENUE_TREND_WIDGET_ID || parentActions.canRemoveWidget(widgetId),
+      onRemoveWidget: (widgetId: string) => {
+        if (widgetId === AI_REVENUE_TREND_WIDGET_ID) {
+          setRevenueTrendRemoved(true);
+          return;
+        }
+
+        parentActions.onRemoveWidget(widgetId);
+      },
+    };
+  }, [parentActions]);
+
+  const dashboard = (
     <section className="ai-generated-dashboard" data-node-id="225:41367">
       {showMetricCards ? (
         <div className={`ai-metric-grid${visibleMetricCards.length < 4 ? " ai-metric-grid-compact" : ""}`}>
@@ -256,7 +285,11 @@ export function AiGeneratedDashboard({
           ))}
         </div>
       ) : null}
-      {showTrendChart ? <AiRevenueTrendChart showSourceBadge={showWidgetSources} /> : null}
+      {showTrendChart && !revenueTrendRemoved ? (
+        <HomepageWidgetScope widgetId={AI_REVENUE_TREND_WIDGET_ID}>
+          <AiRevenueTrendChart showSourceBadge={showWidgetSources} />
+        </HomepageWidgetScope>
+      ) : null}
       <AiAddedWidgets
         addedWidgetIds={addedWidgetIds}
         getCustomWidgetById={getCustomWidgetById}
@@ -266,4 +299,10 @@ export function AiGeneratedDashboard({
       />
     </section>
   );
+
+  if (!scopedActions) {
+    return dashboard;
+  }
+
+  return <HomepageWidgetActionsProvider value={scopedActions}>{dashboard}</HomepageWidgetActionsProvider>;
 }

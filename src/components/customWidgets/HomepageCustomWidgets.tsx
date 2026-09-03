@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 import { isCustomWidgetId, parseCustomWidgetRef, type CustomWidget } from "../../customWidgets/types";
+import { HomepageWidgetScope } from "../HomepageWidgetActions";
 import { CustomWidgetDashboardCard } from "./CustomWidgetDashboardCard";
 
 export function HomepageCustomWidgets({
@@ -30,12 +31,13 @@ export function HomepageCustomWidgets({
         }
 
         return (
-          <CustomWidgetDashboardCard
-            displaySize={parsedRef.size ?? widget.size}
-            key={widgetId}
-            ref={widgetId === highlightedWidgetRefId ? widgetRef : undefined}
-            widget={widget}
-          />
+          <HomepageWidgetScope key={widgetId} widgetId={widgetId}>
+            <CustomWidgetDashboardCard
+              displaySize={parsedRef.size ?? widget.size}
+              ref={widgetId === highlightedWidgetRefId ? widgetRef : undefined}
+              widget={widget}
+            />
+          </HomepageWidgetScope>
         );
       })}
     </div>

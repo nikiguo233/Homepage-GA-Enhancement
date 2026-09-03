@@ -2080,6 +2080,22 @@
   width: 100%;
 }
 
+.custom-widget-dashboard-card .widget-card-inner {
+  position: relative;
+}
+
+.custom-widget-dashboard-more-menu {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+
+.widget-more-menu {
+  position: relative;
+  display: inline-flex;
+}
+
 .custom-widget-dashboard-header h3 {
   margin: 0;
   font-size: var(--font-title-m-size, 15px);

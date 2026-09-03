@@ -6,6 +6,7 @@ import { WidgetDrawerShell } from "./WidgetDrawerShell";
 import { WidgetSizePreview } from "./WidgetSizePreview";
 
 export function ConfigureCustomWidgetPanel({
+  confirmLabel = "Add",
   onAdd,
   onBack,
   onClose,
@@ -14,6 +15,7 @@ export function ConfigureCustomWidgetPanel({
   selectedSize,
   widget,
 }: {
+  confirmLabel?: string;
   onAdd: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -33,7 +35,7 @@ export function ConfigureCustomWidgetPanel({
             <span>Edit Custom Widget</span>
           </button>
           <button className="widget-drawer-primary-button" onClick={onAdd} type="button">
-            Add
+            {confirmLabel}
           </button>
         </div>
       }

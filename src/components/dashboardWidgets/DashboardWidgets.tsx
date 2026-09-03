@@ -9,12 +9,12 @@ import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { forwardRef, useEffect, type HTMLAttributes, type ReactNode, type RefObject } from "react";
+import { HomepageWidgetScope, WidgetMoreMenuButton } from "../HomepageWidgetActions";
 import type { DashboardWidgetId } from "./catalog";
 
 const taskRows = [
@@ -111,11 +111,7 @@ const WidgetCard = forwardRef<HTMLElement, WidgetCardProps>(function WidgetCard(
 });
 
 function WidgetIconButton({ label = "More actions" }: { label?: string }) {
-  return (
-    <button aria-label={label} className="widget-icon-button" type="button">
-      <MoreHorizIcon />
-    </button>
-  );
+  return <WidgetMoreMenuButton />;
 }
 
 function HeaderActions({
@@ -649,24 +645,28 @@ export function DashboardWidget({
   widgetId: DashboardWidgetId;
   widgetRef?: RefObject<HTMLElement | null>;
 }) {
-  switch (widgetId) {
-    case "revenue-overview":
-      return <RevenueOverview />;
-    case "revenue-tasks":
-      return <RevenueTasks />;
-    case "run-report":
-      return <RunReport />;
-    case "run-program":
-      return <RunProgram />;
-    case "file-upload":
-      return <FileUpload />;
-    case "active-batches":
-      return <ActiveBatches />;
-    case "rc-search":
-      return <RCSearch />;
-    case "revenue-progress":
-      return <CloseProcessStatus widgetRef={widgetRef} />;
-    default:
-      return null;
-  }
+  const widget = (() => {
+    switch (widgetId) {
+      case "revenue-overview":
+        return <RevenueOverview />;
+      case "revenue-tasks":
+        return <RevenueTasks />;
+      case "run-report":
+        return <RunReport />;
+      case "run-program":
+        return <RunProgram />;
+      case "file-upload":
+        return <FileUpload />;
+      case "active-batches":
+        return <ActiveBatches />;
+      case "rc-search":
+        return <RCSearch />;
+      case "revenue-progress":
+        return <CloseProcessStatus widgetRef={widgetRef} />;
+      default:
+        return null;
+    }
+  })();
+
+  return <HomepageWidgetScope widgetId={widgetId}>{widget}</HomepageWidgetScope>;
 }

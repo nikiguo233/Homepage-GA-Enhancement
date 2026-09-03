@@ -66,3 +66,7 @@ export const DEFAULT_DASHBOARD_WIDGET_IDS: DashboardWidgetId[] = [
   "active-batches",
   "rc-search",
 ];
+
+export function isDashboardWidgetId(id: string): id is DashboardWidgetId {
+  return DASHBOARD_WIDGET_CATALOG.some((widget) => widget.id === id);
+}

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import type { DashboardWidgetId } from "../components/dashboardWidgets/catalog";
-import { DASHBOARD_WIDGET_CATALOG } from "../components/dashboardWidgets/catalog";
+import { DASHBOARD_WIDGET_CATALOG, isDashboardWidgetId, type DashboardWidgetId } from "../components/dashboardWidgets/catalog";
+import { isCustomWidgetId } from "../customWidgets/types";
 import type { AiGeneratedDashboardVariant } from "../ai/types";
 import type { HomepageCleanupPlan } from "./homepageCleanup";
 import type { HomepageLayout } from "./types";
@@ -13,10 +13,6 @@ type CleanupSnapshot = {
   removedWidgetIds: DashboardWidgetId[];
   widgetOrder: DashboardWidgetId[] | null;
 };
-
-function isDashboardWidgetId(id: string): id is DashboardWidgetId {
-  return DASHBOARD_WIDGET_CATALOG.some((widget) => widget.id === id);
-}
 
 export function useHomepageConfig() {
   const [layout, setLayout] = useState<HomepageLayout>("default");
@@ -59,6 +55,27 @@ export function useHomepageConfig() {
         if (dashboardWidgetIds.length > 0) {
           setAiLibraryWidgetIds((current) => [...new Set([...current, ...dashboardWidgetIds])]);
         }
+      }
+    },
+    [layout],
+  );
+
+  const removeWidget = useCallback(
+    (widgetId: string) => {
+      if (isCustomWidgetId(widgetId)) {
+        setAddedWidgetIds((current) => current.filter((id) => id !== widgetId));
+        return;
+      }
+
+      if (!isDashboardWidgetId(widgetId)) {
+        return;
+      }
+
+      setRemovedWidgetIds((current) => [...new Set([...current, widgetId])]);
+      setAddedWidgetIds((current) => current.filter((id) => id !== widgetId));
+
+      if (layout === "ai-generated") {
+        setAiLibraryWidgetIds((current) => current.filter((id) => id !== widgetId));
       }
     },
     [layout],
@@ -164,6 +181,7 @@ export function useHomepageConfig() {
     layout,
     metricCardOrder,
     removedWidgetIds,
+    removeWidget,
     resetToDefaultLayout,
     setLayout,
     undoCleanup,

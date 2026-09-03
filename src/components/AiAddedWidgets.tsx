@@ -1,6 +1,7 @@
 import { DashboardWidget } from "./dashboardWidgets/DashboardWidgets";
 import { DASHBOARD_WIDGET_CATALOG, type DashboardWidgetId } from "./dashboardWidgets/catalog";
 import { HomepageCustomWidgets } from "./customWidgets/HomepageCustomWidgets";
+import { HomepageWidgetScope } from "./HomepageWidgetActions";
 import type { CustomWidget } from "../customWidgets/types";
 import type { RefObject } from "react";
 
