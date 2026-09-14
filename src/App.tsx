@@ -2310,22 +2310,14 @@ export function App() {
     [startChat],
   );
 
-  const handleEditCustomWidget = useCallback(
-    (widgetId: string) => {
-      const widget = getWidgetById(widgetId);
+  const handleEditCustomWidget = useCallback((widgetId: string) => {
+    const widget = getWidgetById(widgetId);
 
-      if (widget && isAiGeneratedCustomWidget(widget)) {
-        openCustomWidgetHomepageDrawer(widgetId, { entry: "direct" });
-        return;
-      }
-
-      setEditingWidgetId(widgetId);
-      setAiSuggestedWidgetDraft(null);
-      setAiSuggestedEditorStep(null);
-      setHomepageView("edit-widget");
-    },
-    [getWidgetById, openCustomWidgetHomepageDrawer],
-  );
+    setEditingWidgetId(widgetId);
+    setAiSuggestedWidgetDraft(null);
+    setAiSuggestedEditorStep(isAiGeneratedCustomWidget(widget) ? "basic" : null);
+    setHomepageView("edit-widget");
+  }, [getWidgetById]);
 
   const handleEditHomepageWidget = useCallback(
     (widgetRefId: string) => {
