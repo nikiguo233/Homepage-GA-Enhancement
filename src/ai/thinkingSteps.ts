@@ -86,6 +86,8 @@ function isHomepageCreationPrompt(text: string) {
 
   return (
     normalized.includes("create a homepage") ||
+    normalized.includes("create a new homepage") ||
+    normalized.includes("create new homepage") ||
     normalized.includes("quick action") ||
     normalized.includes("data overview") ||
     normalized.includes("daily work")
@@ -119,6 +121,7 @@ function isTopAccountsTablePrompt(text: string) {
   return (
     normalized.includes("top 10 accounts") ||
     normalized.includes("table widget") ||
+    normalized.includes("create a new widget based on my need") ||
     (normalized.includes("table") && normalized.includes("open balance")) ||
     (normalized.includes("accounts") && normalized.includes("open balance"))
   );

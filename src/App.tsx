@@ -61,12 +61,18 @@ import { AiSearchField } from "./components/AiSearchField";
 import { AiGeneratedDashboard } from "./components/AiGeneratedDashboard";
 import { DashboardWidget } from "./components/dashboardWidgets/DashboardWidgets";
 import type { DashboardWidgetId } from "./components/dashboardWidgets/catalog";
+import {
+  HomepageAiBanner,
+  type HomepageAiBannerPrompt,
+  type HomepageAiBannerVariant,
+} from "./components/HomepageAiBanner";
 import { HomepageEmptyState } from "./components/HomepageEmptyState";
 import {
   HomepageWidgetActionsProvider,
   createHomepageWidgetActions,
 } from "./components/HomepageWidgetActions";
 import { OnboardingScreen, type OnboardingTemplateId } from "./components/OnboardingScreen";
+import { isBuildYourOwnOnboardingChoice } from "./components/onboarding/onboardingTemplates";
 import { getCurrentDashboardWidgetIds } from "./homepageConfig/homepageCleanup";
 import type { HomepageCleanupPlan } from "./homepageConfig/homepageCleanup";
 import { FloatingButton } from "./FloatingButton";
@@ -1842,21 +1848,25 @@ export function App() {
       }
 
       addWidgets(dashboardWidgetIds);
+      setHighlightedWidgetRefId(dashboardWidgetIds[0] ?? null);
 
-      if (isAiGenerated) {
-        setHighlightedWidgetRefId(dashboardWidgetIds[0] ?? null);
-        showFeedbackToast(
-          dashboardWidgetIds.length === 1
-            ? "Widget added to your homepage."
-            : `${dashboardWidgetIds.length} widgets added to your homepage.`,
-        );
-      } else if (dashboardWidgetIds.includes("revenue-progress")) {
+      if (dashboardWidgetIds.includes("revenue-progress")) {
         setRevenueProgressAdded(true);
-        setHighlightedWidgetRefId("revenue-progress");
-        showFeedbackToast("Revenue Progress has been added.", { showViewWidgetAction: true });
       }
+
+      const showViewWidgetAction =
+        dashboardWidgetIds.length === 1 && dashboardWidgetIds[0] === "revenue-progress";
+
+      showFeedbackToast(
+        dashboardWidgetIds.length === 1
+          ? dashboardWidgetIds[0] === "revenue-progress"
+            ? "Revenue Progress has been added."
+            : "Widget added to your homepage."
+          : `${dashboardWidgetIds.length} widgets added to your homepage.`,
+        showViewWidgetAction ? { showViewWidgetAction: true } : undefined,
+      );
     },
-    [addWidgets, isAiGenerated, saveWidget, showFeedbackToast],
+    [addWidgets, saveWidget, showFeedbackToast],
   );
   const handleApplyCleanup = useCallback(
     (plan: HomepageCleanupPlan) => {
@@ -1868,8 +1878,10 @@ export function App() {
       } else if (plan.removedWidgetIds.includes("revenue-progress")) {
         setRevenueProgressAdded(false);
       }
+
+      showFeedbackToast("Homepage layout has been updated.");
     },
-    [applyCleanupPlan, isAiGenerated, revenueProgressAdded, startWithEmptyHomepage],
+    [applyCleanupPlan, isAiGenerated, revenueProgressAdded, showFeedbackToast, startWithEmptyHomepage],
   );
   const handleUndoCleanup = useCallback(() => {
     undoCleanup();
@@ -2026,12 +2038,14 @@ export function App() {
           saveWidget,
           variant,
         });
+        showFeedbackToast("Homepage has been applied.");
         return;
       }
 
       applyAiGeneratedLayout();
+      showFeedbackToast("Homepage has been applied.");
     },
-    [applyAiGeneratedLayout, saveWidget, widgets],
+    [applyAiGeneratedLayout, saveWidget, showFeedbackToast, widgets],
   );
   const handleAiGeneratedWidgetAccessFromChat = useCallback(
     (access: CustomWidgetAccess): AssistantResponse | null => {
@@ -2115,6 +2129,9 @@ export function App() {
   const [replacingHomepageWidgetRefId, setReplacingHomepageWidgetRefId] = useState<string | null>(null);
   const [highlightedWidgetRefId, setHighlightedWidgetRefId] = useState<string | null>(null);
   const [notificationBannerVisible, setNotificationBannerVisible] = useState(true);
+  const [homepageAiBannerVisible, setHomepageAiBannerVisible] = useState(true);
+  const [homepageAiBannerVariant, setHomepageAiBannerVariant] =
+    useState<HomepageAiBannerVariant>("prompts");
   const addedWidgetRef = useRef<HTMLElement | null>(null);
   const homepageActive = !showOnboarding;
   const hasAddedWidgets = addedWidgetIds.length > 0 || revenueProgressAdded;
@@ -2179,57 +2196,14 @@ export function App() {
   );
 
   const handleSelectOnboardingTemplate = useCallback(
-    (_templateId: OnboardingTemplateId) => {
+    (templateId: OnboardingTemplateId) => {
       resetToDefaultLayout();
       setRevenueProgressAdded(false);
-      setStartWithEmptyHomepage(false);
+      setStartWithEmptyHomepage(isBuildYourOwnOnboardingChoice(templateId));
       setHomepageView("home");
       setShowOnboarding(false);
     },
     [resetToDefaultLayout],
-  );
-
-  const prepareOnboardingAiSession = useCallback(() => {
-    resetToDefaultLayout();
-    setRevenueProgressAdded(false);
-    setNotificationBannerVisible(false);
-    setStartWithEmptyHomepage(true);
-  }, [resetToDefaultLayout]);
-
-  const handleOnboardingResetAiSession = useCallback(() => {
-    closeChat();
-    handleNewChat();
-  }, [closeChat, handleNewChat]);
-
-  const handleOnboardingLaunchAiPrompt = useCallback(
-    (prompt: string) => {
-      const trimmed = prompt.trim();
-
-      if (!trimmed) {
-        return;
-      }
-
-      prepareOnboardingAiSession();
-      setHomepageView("home");
-      setTemplateEditorReturnView("home");
-      setShowOnboarding(false);
-      startChat({
-        context: "homepage",
-        draftMessage: trimmed,
-        reset: true,
-        showEmptyStateSuggestions: false,
-      });
-    },
-    [prepareOnboardingAiSession, startChat],
-  );
-
-  const handleOnboardingSelectAiPrompt = useCallback(
-    (action: SuggestedAction) => {
-      if (action.prompt?.trim()) {
-        handleOnboardingLaunchAiPrompt(action.prompt);
-      }
-    },
-    [handleOnboardingLaunchAiPrompt],
   );
 
   const handleOpenManageCustomWidgetsFromDrawer = useCallback(() => {
@@ -2293,6 +2267,23 @@ export function App() {
     setTemplateEditorReturnView("home");
     openChat();
   }, [openChat]);
+
+  const handleHomepageAiBannerPrompt = useCallback(
+    (prompt: HomepageAiBannerPrompt) => {
+      startChat({
+        context: "homepage",
+        draftMessage: prompt.prompt,
+        reset: true,
+        showEmptyStateSuggestions: false,
+      });
+    },
+    [startChat],
+  );
+
+  const handleHomepageAiBannerVariantChange = useCallback((variant: HomepageAiBannerVariant) => {
+    setHomepageAiBannerVariant(variant);
+    setHomepageAiBannerVisible(true);
+  }, []);
 
   const handleCreateWidgetOption = useCallback(
     (option: CreateWidgetOption) => {
@@ -2796,11 +2787,7 @@ export function App() {
   const showWidgetDrawer = isWidgetDrawerOpen && (isHomeView || isWidgetDrawerOverlay);
 
   return showOnboarding ? (
-    <OnboardingScreen
-      onResetAiSession={handleOnboardingResetAiSession}
-      onSelectAiPrompt={handleOnboardingSelectAiPrompt}
-      onSelectTemplate={handleSelectOnboardingTemplate}
-    />
+    <OnboardingScreen onSelectTemplate={handleSelectOnboardingTemplate} />
   ) : (
     <div
       className="nebula-shell"
@@ -2900,27 +2887,66 @@ export function App() {
                 />
               ) : null}
               <WelcomeSearch />
-              {!isEmptyHomepage || hasAddedWidgets ? (
-                <HomepageWidgetActionsProvider value={homepageWidgetActions}>
-                  <DashboardGrid
-                    addedWidgetIds={addedWidgetIds}
-                    addedWidgetRef={addedWidgetRef}
-                    aiDashboardVariant={aiDashboardVariant}
-                    aiLibraryWidgetIds={aiLibraryWidgetIds}
-                    getCustomWidgetById={getWidgetById}
-                    hiddenMetricCardLabels={hiddenMetricCardLabels}
-                    highlightedWidgetRefId={highlightedWidgetRefId}
-                    isAiGenerated={isAiGenerated}
-                    metricCardOrder={metricCardOrder}
-                    removedWidgetIds={removedWidgetIds}
-                    revenueProgressAdded={revenueProgressAdded}
-                    startWithEmptyHomepage={isEmptyHomepage}
-                    widgetOrder={widgetOrder}
+              <div className="homepage-dashboard-section">
+                {homepageAiBannerVisible ? (
+                  <HomepageAiBanner
+                    onClose={() => setHomepageAiBannerVisible(false)}
+                    onGetStarted={openChat}
+                    onSelectPrompt={handleHomepageAiBannerPrompt}
+                    variant={homepageAiBannerVariant}
                   />
-                </HomepageWidgetActionsProvider>
-              ) : (
-                <HomepageEmptyState />
-              )}
+                ) : null}
+                {!isEmptyHomepage || hasAddedWidgets ? (
+                  <HomepageWidgetActionsProvider value={homepageWidgetActions}>
+                    <DashboardGrid
+                      addedWidgetIds={addedWidgetIds}
+                      addedWidgetRef={addedWidgetRef}
+                      aiDashboardVariant={aiDashboardVariant}
+                      aiLibraryWidgetIds={aiLibraryWidgetIds}
+                      getCustomWidgetById={getWidgetById}
+                      hiddenMetricCardLabels={hiddenMetricCardLabels}
+                      highlightedWidgetRefId={highlightedWidgetRefId}
+                      isAiGenerated={isAiGenerated}
+                      metricCardOrder={metricCardOrder}
+                      removedWidgetIds={removedWidgetIds}
+                      revenueProgressAdded={revenueProgressAdded}
+                      startWithEmptyHomepage={isEmptyHomepage}
+                      widgetOrder={widgetOrder}
+                    />
+                  </HomepageWidgetActionsProvider>
+                ) : (
+                  <HomepageEmptyState />
+                )}
+                <div
+                  className="homepage-ai-banner-preview"
+                  role="group"
+                  aria-label="AI banner style options"
+                >
+                  <span className="homepage-ai-banner-preview-label">Banner style</span>
+                  <div className="homepage-ai-banner-preview-options">
+                    <button
+                      aria-pressed={homepageAiBannerVariant === "prompts"}
+                      className={`homepage-ai-banner-preview-option${
+                        homepageAiBannerVariant === "prompts" ? " is-active" : ""
+                      }`}
+                      onClick={() => handleHomepageAiBannerVariantChange("prompts")}
+                      type="button"
+                    >
+                      Option 1
+                    </button>
+                    <button
+                      aria-pressed={homepageAiBannerVariant === "cta"}
+                      className={`homepage-ai-banner-preview-option${
+                        homepageAiBannerVariant === "cta" ? " is-active" : ""
+                      }`}
+                      onClick={() => handleHomepageAiBannerVariantChange("cta")}
+                      type="button"
+                    >
+                      Option 2
+                    </button>
+                  </div>
+                </div>
+              </div>
             </>
           ) : null}
           {homepageView === "manage-hub" ? (
