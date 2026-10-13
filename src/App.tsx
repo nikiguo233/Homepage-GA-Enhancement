@@ -2270,6 +2270,14 @@ export function App() {
 
   const handleHomepageAiBannerPrompt = useCallback(
     (prompt: HomepageAiBannerPrompt) => {
+      const shouldSendImmediately =
+        prompt.id === "create-homepage" || prompt.id === "recommend-widgets";
+
+      if (shouldSendImmediately) {
+        startChatWithPrompt(prompt.prompt, { context: "homepage" });
+        return;
+      }
+
       startChat({
         context: "homepage",
         draftMessage: prompt.prompt,
@@ -2277,7 +2285,7 @@ export function App() {
         showEmptyStateSuggestions: false,
       });
     },
-    [startChat],
+    [startChat, startChatWithPrompt],
   );
 
   const handleHomepageAiBannerVariantChange = useCallback((variant: HomepageAiBannerVariant) => {
