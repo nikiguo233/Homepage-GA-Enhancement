@@ -72,7 +72,7 @@ import {
   createHomepageWidgetActions,
 } from "./components/HomepageWidgetActions";
 import { OnboardingScreen, type OnboardingTemplateId } from "./components/OnboardingScreen";
-import { isBuildYourOwnOnboardingChoice } from "./components/onboarding/onboardingTemplates";
+import { isCreateWithAiOnboardingChoice } from "./components/onboarding/onboardingTemplates";
 import { getCurrentDashboardWidgetIds } from "./homepageConfig/homepageCleanup";
 import type { HomepageCleanupPlan } from "./homepageConfig/homepageCleanup";
 import { FloatingButton } from "./FloatingButton";
@@ -2197,13 +2197,19 @@ export function App() {
 
   const handleSelectOnboardingTemplate = useCallback(
     (templateId: OnboardingTemplateId) => {
+      const isCreateWithAi = isCreateWithAiOnboardingChoice(templateId);
+
       resetToDefaultLayout();
       setRevenueProgressAdded(false);
-      setStartWithEmptyHomepage(isBuildYourOwnOnboardingChoice(templateId));
+      setStartWithEmptyHomepage(isCreateWithAi);
       setHomepageView("home");
       setShowOnboarding(false);
+
+      if (isCreateWithAi) {
+        startChatWithPrompt("Create a new Homepage for me", { context: "homepage" });
+      }
     },
-    [resetToDefaultLayout],
+    [resetToDefaultLayout, startChatWithPrompt],
   );
 
   const handleOpenManageCustomWidgetsFromDrawer = useCallback(() => {

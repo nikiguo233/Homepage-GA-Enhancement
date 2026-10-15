@@ -6341,6 +6341,10 @@ a {
 }
 
 .onboarding-template-copy h2 {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   margin: 0;
   color: #ffffff;
   font-size: 17px;
@@ -6349,12 +6353,202 @@ a {
   letter-spacing: 0.1px;
 }
 
+.onboarding-template-ai-title-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
 .onboarding-template-copy p {
   margin: 0;
   color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
   line-height: 20px;
   letter-spacing: 0.1px;
+}
+
+.onboarding-create-ai-preview {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 256px;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 1px 2px 12px rgba(138, 138, 138, 0.17);
+}
+
+.onboarding-create-ai-preview-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: linear-gradient(123.12deg, #b6fff9 11.93%, #8fb2f6 44.38%, #b69bfe 85%);
+  pointer-events: none;
+}
+
+.onboarding-create-ai-preview-card {
+  position: absolute;
+  inset: 3px;
+  display: block;
+  overflow: hidden;
+  border: 0;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.onboarding-create-ai-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.onboarding-create-ai-preview-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.onboarding-create-ai-preview-welcome {
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: normal;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+.onboarding-create-ai-preview-search-skeleton {
+  width: 190px;
+  height: 16px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.onboarding-create-ai-preview-kpi-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.onboarding-create-ai-preview-kpi {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  height: 64px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.onboarding-create-ai-preview-skeleton {
+  display: block;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.onboarding-create-ai-preview-skeleton.is-label {
+  width: 72px;
+  height: 10px;
+}
+
+.onboarding-create-ai-preview-skeleton.is-value {
+  width: 44px;
+  height: 18px;
+  border-radius: 9px;
+}
+
+.onboarding-create-ai-preview-skeleton.is-chart-title {
+  width: 96px;
+  height: 10px;
+}
+
+.onboarding-create-ai-preview-skeleton.is-chart-meta {
+  width: 56px;
+  height: 10px;
+}
+
+.onboarding-create-ai-preview-chart {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.onboarding-create-ai-preview-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.onboarding-create-ai-preview-bars {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: 4px;
+  min-height: 0;
+  width: 100%;
+}
+
+.onboarding-create-ai-preview-bars > span {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 4px 4px 0 0;
+  background: #c6dcff;
+  opacity: 0.45;
+}
+
+.onboarding-create-ai-preview-bars > span:nth-child(1) {
+  opacity: 0.3;
+}
+
+.onboarding-create-ai-preview-bars > span:nth-child(2),
+.onboarding-create-ai-preview-bars > span:nth-child(4) {
+  opacity: 0.4;
+}
+
+.onboarding-create-ai-preview-bars > span:nth-child(3),
+.onboarding-create-ai-preview-bars > span:nth-child(6) {
+  opacity: 0.5;
+}
+
+.onboarding-create-ai-preview-bars > span:nth-child(5) {
+  opacity: 0.6;
+}
+
+.onboarding-create-ai-preview-bars > span:nth-child(7) {
+  opacity: 0.8;
+}
+
+.onboarding-create-ai-preview-axis {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.onboarding-create-ai-preview-axis > span {
+  width: 20px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.onboarding-template-preview-button:hover .onboarding-create-ai-preview {
+  box-shadow:
+    1px 2px 12px rgba(138, 138, 138, 0.17),
+    0 8px 24px rgba(0, 0, 0, 0.24);
 }
 
 @media (max-width: 980px) {
