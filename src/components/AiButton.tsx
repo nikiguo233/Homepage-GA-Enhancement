@@ -1,5 +1,6 @@
 import { useId } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import aiSparkButtonDarkUrl from "../assets/ai-spark-button-dark.svg";
 import "./AiButton.css";
 
 export type AiButtonBackground = "dark" | "light";
@@ -14,7 +15,7 @@ function getIconFill(
   background: AiButtonBackground,
   gradientId: string,
 ): string {
-  if (variant === "secondary" && background === "light") {
+  if (variant === "secondary") {
     return `url(#${gradientId})`;
   }
 
@@ -48,6 +49,7 @@ export function AiButton({
   ...props
 }: AiButtonProps) {
   const gradientId = `occam-ai-button-spark-${useId().replace(/:/g, "")}`;
+  const useDarkSparkAsset = variant === "secondary" && background === "dark";
 
   return (
     <button
@@ -68,9 +70,16 @@ export function AiButton({
       {showIcon ? (
         icon ? (
           <span className="occam-ai-button__icon occam-ai-button__icon--custom">{icon}</span>
+        ) : useDarkSparkAsset ? (
+          <img
+            alt=""
+            aria-hidden="true"
+            className="occam-ai-button__icon"
+            src={aiSparkButtonDarkUrl}
+          />
         ) : (
           <svg aria-hidden="true" className="occam-ai-button__icon" viewBox="0 0 16 16" fill="none">
-            {variant === "secondary" && background === "light" ? (
+            {variant === "secondary" ? (
               <defs>
                 <linearGradient
                   gradientUnits="userSpaceOnUse"

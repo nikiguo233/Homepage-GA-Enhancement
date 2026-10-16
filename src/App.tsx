@@ -72,7 +72,6 @@ import {
   createHomepageWidgetActions,
 } from "./components/HomepageWidgetActions";
 import { OnboardingScreen, type OnboardingTemplateId } from "./components/OnboardingScreen";
-import { isCreateWithAiOnboardingChoice } from "./components/onboarding/onboardingTemplates";
 import { getCurrentDashboardWidgetIds } from "./homepageConfig/homepageCleanup";
 import type { HomepageCleanupPlan } from "./homepageConfig/homepageCleanup";
 import { FloatingButton } from "./FloatingButton";
@@ -2196,21 +2195,24 @@ export function App() {
   );
 
   const handleSelectOnboardingTemplate = useCallback(
-    (templateId: OnboardingTemplateId) => {
-      const isCreateWithAi = isCreateWithAiOnboardingChoice(templateId);
-
+    (_templateId: OnboardingTemplateId) => {
       resetToDefaultLayout();
       setRevenueProgressAdded(false);
-      setStartWithEmptyHomepage(isCreateWithAi);
+      setStartWithEmptyHomepage(false);
       setHomepageView("home");
       setShowOnboarding(false);
-
-      if (isCreateWithAi) {
-        startChatWithPrompt("Create a new Homepage for me", { context: "homepage" });
-      }
     },
-    [resetToDefaultLayout, startChatWithPrompt],
+    [resetToDefaultLayout],
   );
+
+  const handleOnboardingCreateWithAi = useCallback(() => {
+    resetToDefaultLayout();
+    setRevenueProgressAdded(false);
+    setStartWithEmptyHomepage(true);
+    setHomepageView("home");
+    setShowOnboarding(false);
+    startChatWithPrompt("Create a new Homepage for me", { context: "homepage" });
+  }, [resetToDefaultLayout, startChatWithPrompt]);
 
   const handleOpenManageCustomWidgetsFromDrawer = useCallback(() => {
     setWidgetDrawerStep("closed");
@@ -2801,7 +2803,10 @@ export function App() {
   const showWidgetDrawer = isWidgetDrawerOpen && (isHomeView || isWidgetDrawerOverlay);
 
   return showOnboarding ? (
-    <OnboardingScreen onSelectTemplate={handleSelectOnboardingTemplate} />
+    <OnboardingScreen
+      onCreateWithAi={handleOnboardingCreateWithAi}
+      onSelectTemplate={handleSelectOnboardingTemplate}
+    />
   ) : (
     <div
       className="nebula-shell"

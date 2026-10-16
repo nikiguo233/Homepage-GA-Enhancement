@@ -2,16 +2,6 @@ import billingStandardPreviewUrl from "../../assets/onboarding-billing-standard.
 import developerPreviewUrl from "../../assets/onboarding-developer.png";
 import revenueStandardPreviewUrl from "../../assets/onboarding-revenue-standard.png";
 
-export const ONBOARDING_CREATE_WITH_AI_ID = "create-with-zuora-ai" as const;
-
-export type OnboardingTemplate = {
-  description: string;
-  id: string;
-  imageUrl?: string;
-  name: string;
-  variant?: "ai";
-};
-
 export const ONBOARDING_TEMPLATES = [
   {
     description:
@@ -33,17 +23,6 @@ export const ONBOARDING_TEMPLATES = [
     imageUrl: developerPreviewUrl,
     name: "Developer",
   },
-  {
-    description:
-      "Let Zuora AI design your personalized homepage from a simple prompt, with options to customize further.",
-    id: ONBOARDING_CREATE_WITH_AI_ID,
-    name: "Create with Zuora AI",
-    variant: "ai",
-  },
-] as const satisfies readonly OnboardingTemplate[];
+] as const;
 
 export type OnboardingTemplateId = (typeof ONBOARDING_TEMPLATES)[number]["id"];
-
-export function isCreateWithAiOnboardingChoice(templateId: OnboardingTemplateId) {
-  return templateId === ONBOARDING_CREATE_WITH_AI_ID;
-}
